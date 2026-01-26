@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
-  ChevronLeft, ChevronRight, X
+  ChevronLeft, ChevronRight, X, Wifi, WifiOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -18,6 +18,13 @@ import {
 } from '@/components/ui';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+
+// Cliente Supabase para Realtime
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface InventoryItem {
   id: string;
@@ -45,6 +52,8 @@ export default function InventarioPage() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [isRealtime, setIsRealtime] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   
   // Filtros
   const [search, setSearch] = useState('');
@@ -150,6 +159,40 @@ export default function InventarioPage() {
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);
+
+  // Suscripción a Realtime de Supabase
+  useEffect(() => {
+    // Crear canal de suscripción
+    const channel = supabase
+      .channel('inventory-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'inventory',
+        },
+        (payload) => {
+          console.log('🔄 Cambio en tiempo real:', payload.eventType);
+          // Recargar datos cuando hay cualquier cambio
+          fetchInventory();
+          fetchMarcas();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Estado Realtime:', status);
+        setIsRealtime(status === 'SUBSCRIBED');
+      });
+
+    channelRef.current = channel;
+
+    // Cleanup al desmontar
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [fetchInventory, fetchMarcas]);
 
   // Resetear página al cambiar filtros
   useEffect(() => {
@@ -338,9 +381,20 @@ export default function InventarioPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
-          <p className="text-muted-foreground">Gestiona el inventario de baterías</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
+            <p className="text-muted-foreground">Gestiona el inventario de baterías</p>
+          </div>
+          {/* Indicador de tiempo real */}
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+            isRealtime 
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+          }`}>
+            {isRealtime ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            {isRealtime ? 'En vivo' : 'Conectando...'}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => { setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' }); setAddDialogOpen(true); }}>
