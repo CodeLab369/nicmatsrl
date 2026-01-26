@@ -88,7 +88,7 @@ export default function InventarioPage() {
 
   // Cargar amperajes por marca
   const fetchAmperajes = useCallback(async (marca: string) => {
-    if (!marca) {
+    if (!marca || marca === '_all') {
       setAmperajesOptions([]);
       return;
     }
@@ -111,7 +111,7 @@ export default function InventarioPage() {
   // Cargar amperajes cuando cambia la marca
   useEffect(() => {
     fetchAmperajes(filterMarca);
-    setFilterAmperaje(''); // Reset amperaje cuando cambia la marca
+    setFilterAmperaje('_all'); // Reset amperaje cuando cambia la marca
   }, [filterMarca, fetchAmperajes]);
 
   // Cargar inventario
@@ -123,9 +123,9 @@ export default function InventarioPage() {
         limit: limit.toString(),
       });
       if (search) params.set('search', search);
-      if (filterMarca) params.set('marca', filterMarca);
-      if (filterAmperaje) params.set('amperaje', filterAmperaje);
-      if (cantidadOp && cantidadVal) {
+      if (filterMarca && filterMarca !== '_all') params.set('marca', filterMarca);
+      if (filterAmperaje && filterAmperaje !== '_all') params.set('amperaje', filterAmperaje);
+      if (cantidadOp && cantidadOp !== '_none' && cantidadVal) {
         params.set('cantidadOp', cantidadOp);
         params.set('cantidadVal', cantidadVal);
       }
@@ -225,9 +225,9 @@ export default function InventarioPage() {
 
   const clearFilters = () => {
     setSearch('');
-    setFilterMarca('');
-    setFilterAmperaje('');
-    setCantidadOp('');
+    setFilterMarca('_all');
+    setFilterAmperaje('_all');
+    setCantidadOp('_none');
     setCantidadVal('');
   };
 
@@ -424,18 +424,18 @@ export default function InventarioPage() {
                 <SelectValue placeholder="Todas las marcas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las marcas</SelectItem>
+                <SelectItem value="_all">Todas las marcas</SelectItem>
                 {marcasOptions.map((marca) => (
                   <SelectItem key={marca} value={marca}>{marca}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filterAmperaje} onValueChange={setFilterAmperaje} disabled={!filterMarca}>
+            <Select value={filterAmperaje} onValueChange={setFilterAmperaje} disabled={!filterMarca || filterMarca === '_all'}>
               <SelectTrigger>
-                <SelectValue placeholder={filterMarca ? "Todos los amperajes" : "Seleccione marca"} />
+                <SelectValue placeholder={filterMarca && filterMarca !== '_all' ? "Todos los amperajes" : "Seleccione marca"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los amperajes</SelectItem>
+                <SelectItem value="_all">Todos los amperajes</SelectItem>
                 {amperajesOptions.map((amp) => (
                   <SelectItem key={amp} value={amp}>{amp}</SelectItem>
                 ))}
@@ -446,6 +446,7 @@ export default function InventarioPage() {
                 <SelectValue placeholder="Cantidad..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="_none">Sin filtro</SelectItem>
                 <SelectItem value="eq">=  Igual a</SelectItem>
                 <SelectItem value="gt">&gt;  Mayor que</SelectItem>
                 <SelectItem value="lt">&lt;  Menor que</SelectItem>
@@ -459,9 +460,9 @@ export default function InventarioPage() {
                 placeholder="Valor"
                 value={cantidadVal}
                 onChange={(e) => setCantidadVal(e.target.value)}
-                disabled={!cantidadOp}
+                disabled={!cantidadOp || cantidadOp === '_none'}
               />
-              {(search || filterMarca || filterAmperaje || cantidadOp) && (
+              {(search || (filterMarca && filterMarca !== '_all') || (filterAmperaje && filterAmperaje !== '_all') || (cantidadOp && cantidadOp !== '_none')) && (
                 <Button variant="ghost" size="icon" onClick={clearFilters}>
                   <X className="h-4 w-4" />
                 </Button>
