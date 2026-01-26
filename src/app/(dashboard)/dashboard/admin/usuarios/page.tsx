@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types';
@@ -30,18 +29,6 @@ import { CreateUserDialog } from '@/components/admin/create-user-dialog';
 import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import { useRouter } from 'next/navigation';
 
-// Función para mapear datos de Supabase a User
-const mapUser = (u: any): User => ({
-  id: u.id,
-  username: u.username,
-  fullName: u.full_name,
-  role: u.role,
-  isActive: u.is_active,
-  lastLogin: u.last_login,
-  createdAt: u.created_at,
-  updatedAt: u.updated_at,
-});
-
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +42,6 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const supabase = useMemo(() => createBrowserClient(), []);
 
   // Verificar rol admin
   useEffect(() => {
@@ -64,16 +50,15 @@ export default function UsersPage() {
     }
   }, [currentUser, router]);
 
-  // Cargar usuarios inicial
+  // Cargar usuarios usando la API
   const fetchUsers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers((data || []).map(mapUser));
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      
+      if (data.users) {
+        setUsers(data.users);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -84,35 +69,12 @@ export default function UsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, toast]);
+  }, [toast]);
 
-  // Suscripción a tiempo real
+  // Cargar usuarios al montar
   useEffect(() => {
     fetchUsers();
-
-    // Configurar Realtime
-    const channel = supabase
-      .channel('users-realtime')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'users' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setUsers(prev => [mapUser(payload.new), ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setUsers(prev => prev.map(u => 
-              u.id === payload.new.id ? mapUser(payload.new) : u
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setUsers(prev => prev.filter(u => u.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [supabase, fetchUsers]);
+  }, [fetchUsers]);
 
   // Filtrar usuarios con useMemo
   const filteredUsers = useMemo(() => {
@@ -157,7 +119,9 @@ export default function UsersPage() {
         description: SUCCESS_MESSAGES.DELETED,
         variant: 'success',
       });
-      // Realtime se encarga de actualizar la lista
+      
+      // Recargar lista
+      fetchUsers();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({
@@ -340,7 +304,7 @@ export default function UsersPage() {
       <CreateUserDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onSuccess={() => {}} // Realtime se encarga
+        onSuccess={fetchUsers}
       />
 
       {selectedUser && (
@@ -348,7 +312,7 @@ export default function UsersPage() {
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           user={selectedUser}
-          onSuccess={() => {}} // Realtime se encarga
+          onSuccess={fetchUsers}
         />
       )}
 

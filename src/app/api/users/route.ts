@@ -1,24 +1,45 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 
-// Cliente admin de Supabase con service_role key
-const supabaseAdmin = createClient(
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// GET - Listar usuarios
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const users = (data || []).map((u) => ({
+      id: u.id,
+      username: u.username,
+      fullName: u.full_name,
+      role: u.role,
+      isActive: u.is_active,
+      lastLogin: u.last_login,
+      createdAt: u.created_at,
+      updatedAt: u.updated_at,
+    }));
+
+    return NextResponse.json({ users });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return NextResponse.json({ error: 'Error al obtener usuarios' }, { status: 500 });
+  }
+}
+
+// POST - Crear usuario
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { username, password, fullName, role } = body;
+    const { username, password, fullName, role } = await request.json();
 
-    // Validar campos requeridos
     if (!username || !password || !fullName || !role) {
       return NextResponse.json(
         { error: 'Todos los campos son requeridos' },
@@ -26,11 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear email basado en username
-    const email = `${username.toLowerCase()}@nicmat.local`;
-
     // Verificar si el username ya existe
-    const { data: existingUser } = await supabaseAdmin
+    const { data: existingUser } = await supabase
       .from('users')
       .select('id')
       .eq('username', username)
@@ -43,40 +61,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear usuario en Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+    // Hash de la contraseña
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    if (authError) {
-      console.error('Auth error:', authError);
-      return NextResponse.json(
-        { error: 'Error al crear el usuario en autenticación' },
-        { status: 500 }
-      );
-    }
-
-    // Crear usuario en la tabla users
-    const { data: userData, error: userError } = await supabaseAdmin
+    // Crear usuario
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .insert({
-        auth_id: authData.user.id,
         username,
+        password_hash: passwordHash,
         full_name: fullName,
         role,
         is_active: true,
       })
-      .select()
+      .select('id, username, full_name, role, is_active, created_at')
       .single();
 
     if (userError) {
       console.error('User error:', userError);
-      // Si falla, eliminar el usuario de Auth
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json(
-        { error: 'Error al crear el perfil del usuario' },
+        { error: 'Error al crear el usuario' },
         { status: 500 }
       );
     }
@@ -91,90 +95,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DELETE - Eliminar usuario
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('id');
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'ID de usuario requerido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });
     }
 
-    // Obtener el auth_id del usuario
-    const { data: user, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('auth_id')
-      .eq('id', userId)
-      .single();
-
-    if (fetchError || !user) {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
-      );
-    }
-
-    // Eliminar de la tabla users
-    const { error: deleteError } = await supabaseAdmin
+    const { error } = await supabase
       .from('users')
       .delete()
       .eq('id', userId);
 
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-      return NextResponse.json(
-        { error: 'Error al eliminar el usuario' },
-        { status: 500 }
-      );
-    }
-
-    // Eliminar de Supabase Auth
-    if (user.auth_id) {
-      await supabaseAdmin.auth.admin.deleteUser(user.auth_id);
+    if (error) {
+      console.error('Delete error:', error);
+      return NextResponse.json({ error: 'Error al eliminar el usuario' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
 
+// PATCH - Actualizar usuario
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id, username, fullName, role, isActive, newPassword } = body;
+    const { id, username, fullName, role, isActive, newPassword } = await request.json();
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'ID de usuario requerido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });
     }
 
-    // Obtener usuario actual
-    const { data: currentUser, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !currentUser) {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
-      );
-    }
-
-    // Verificar si el nuevo username ya está en uso por otro usuario
-    if (username && username !== currentUser.username) {
-      const { data: existingUser } = await supabaseAdmin
+    // Verificar si el nuevo username ya está en uso
+    if (username) {
+      const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('username', username)
@@ -189,53 +148,34 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // Actualizar en la tabla users
-    const { error: updateError } = await supabaseAdmin
+    // Preparar datos de actualización
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (username) updateData.username = username;
+    if (fullName) updateData.full_name = fullName;
+    if (role) updateData.role = role;
+    if (isActive !== undefined) updateData.is_active = isActive;
+
+    // Si hay nueva contraseña, hashearla
+    if (newPassword) {
+      updateData.password_hash = await bcrypt.hash(newPassword, 12);
+    }
+
+    const { error } = await supabase
       .from('users')
-      .update({
-        username: username || currentUser.username,
-        full_name: fullName || currentUser.full_name,
-        role: role || currentUser.role,
-        is_active: isActive !== undefined ? isActive : currentUser.is_active,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id);
 
-    if (updateError) {
-      console.error('Update error:', updateError);
-      return NextResponse.json(
-        { error: 'Error al actualizar el usuario' },
-        { status: 500 }
-      );
-    }
-
-    // Si hay nueva contraseña, actualizarla en Auth
-    if (newPassword && currentUser.auth_id) {
-      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-        currentUser.auth_id,
-        { password: newPassword }
-      );
-
-      if (authError) {
-        console.error('Auth update error:', authError);
-        // No fallar completamente, el usuario ya se actualizó
-      }
-    }
-
-    // Si cambió el username, actualizar el email en Auth
-    if (username && username !== currentUser.username && currentUser.auth_id) {
-      const newEmail = `${username.toLowerCase()}@nicmat.local`;
-      await supabaseAdmin.auth.admin.updateUserById(currentUser.auth_id, {
-        email: newEmail,
-      });
+    if (error) {
+      console.error('Update error:', error);
+      return NextResponse.json({ error: 'Error al actualizar el usuario' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Server error:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

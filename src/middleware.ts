@@ -1,41 +1,42 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
+import { jwtVerify } from 'jose';
 
-// Rutas públicas que no requieren autenticación
-const publicRoutes = ['/login'];
-
-// Rutas protegidas que requieren autenticación
-const protectedRoutes = ['/dashboard'];
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'nicmat-srl-secret-key-2024'
+);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Actualizar sesión de Supabase
-  const response = await updateSession(request);
+  // Rutas públicas
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/api/auth')) {
+    // Si es la raíz, redirigir a login
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    return NextResponse.next();
+  }
 
-  // Verificar si es una ruta pública
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
-  
-  // Verificar si es una ruta protegida
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
+  // Verificar token para rutas protegidas
+  const token = request.cookies.get('auth-token')?.value;
 
-  // Si es la raíz, redirigir a login
-  if (pathname === '/') {
+  if (!token) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  return response;
+  try {
+    await jwtVerify(token, JWT_SECRET);
+    return NextResponse.next();
+  } catch {
+    // Token inválido, redirigir a login
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.cookies.delete('auth-token');
+    return response;
+  }
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
