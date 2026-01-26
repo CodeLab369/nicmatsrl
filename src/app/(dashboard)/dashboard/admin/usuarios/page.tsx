@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase';
 import { useAuth } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,18 @@ import { CreateUserDialog } from '@/components/admin/create-user-dialog';
 import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import { useRouter } from 'next/navigation';
 
+// Función para mapear datos de Supabase a User
+const mapUser = (u: any): User => ({
+  id: u.id,
+  username: u.username,
+  fullName: u.full_name,
+  role: u.role,
+  isActive: u.is_active,
+  lastLogin: u.last_login,
+  createdAt: u.created_at,
+  updatedAt: u.updated_at,
+});
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,29 +64,16 @@ export default function UsersPage() {
     }
   }, [currentUser, router]);
 
-  // Cargar usuarios - optimizado
+  // Cargar usuarios inicial
   const fetchUsers = useCallback(async () => {
     try {
-      setIsLoading(true);
       const { data, error } = await supabase
         .from('users')
         .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      const mappedUsers: User[] = (data || []).map((u) => ({
-        id: u.id,
-        username: u.username,
-        fullName: u.full_name,
-        role: u.role,
-        isActive: u.is_active,
-        lastLogin: u.last_login,
-        createdAt: u.created_at,
-        updatedAt: u.updated_at,
-      }));
-
-      setUsers(mappedUsers);
+      setUsers((data || []).map(mapUser));
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -87,20 +86,41 @@ export default function UsersPage() {
     }
   }, [supabase, toast]);
 
+  // Suscripción a tiempo real
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
 
-  // Filtrar usuarios con useMemo para evitar re-renders
+    // Configurar Realtime
+    const channel = supabase
+      .channel('users-realtime')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'users' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setUsers(prev => [mapUser(payload.new), ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setUsers(prev => prev.map(u => 
+              u.id === payload.new.id ? mapUser(payload.new) : u
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setUsers(prev => prev.filter(u => u.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, fetchUsers]);
+
+  // Filtrar usuarios con useMemo
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return users;
-    }
+    if (!searchQuery.trim()) return users;
     const query = searchQuery.toLowerCase();
-    return users.filter(
-      (u) =>
-        u.username.toLowerCase().includes(query) ||
-        u.fullName.toLowerCase().includes(query)
+    return users.filter(u =>
+      u.username.toLowerCase().includes(query) ||
+      u.fullName.toLowerCase().includes(query)
     );
   }, [searchQuery, users]);
 
@@ -137,8 +157,7 @@ export default function UsersPage() {
         description: SUCCESS_MESSAGES.DELETED,
         variant: 'success',
       });
-
-      await fetchUsers();
+      // Realtime se encarga de actualizar la lista
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({
@@ -321,7 +340,7 @@ export default function UsersPage() {
       <CreateUserDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onSuccess={fetchUsers}
+        onSuccess={() => {}} // Realtime se encarga
       />
 
       {selectedUser && (
@@ -329,7 +348,7 @@ export default function UsersPage() {
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           user={selectedUser}
-          onSuccess={fetchUsers}
+          onSuccess={() => {}} // Realtime se encarga
         />
       )}
 

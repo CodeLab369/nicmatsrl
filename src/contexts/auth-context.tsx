@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import { User } from '@/types';
@@ -21,54 +21,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const supabase = createBrowserClient();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (authId?: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      let userId = authId;
       
-      if (session?.user) {
-        // Obtener datos del usuario de la tabla users
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('auth_id', session.user.id)
-          .single();
-
-        if (error || !userData) {
-          setUser(null);
-          return;
-        }
-
-        setUser({
-          id: userData.id,
-          username: userData.username,
-          fullName: userData.full_name,
-          role: userData.role,
-          isActive: userData.is_active,
-          lastLogin: userData.last_login,
-          createdAt: userData.created_at,
-          updatedAt: userData.updated_at,
-        });
-      } else {
-        setUser(null);
+      if (!userId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        userId = session?.user?.id;
       }
+      
+      if (!userId) {
+        setUser(null);
+        return;
+      }
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
+        .eq('auth_id', userId)
+        .single();
+
+      if (error || !userData) {
+        setUser(null);
+        return;
+      }
+
+      setUser({
+        id: userData.id,
+        username: userData.username,
+        fullName: userData.full_name,
+        role: userData.role,
+        isActive: userData.is_active,
+        lastLogin: userData.last_login,
+        createdAt: userData.created_at,
+        updatedAt: userData.updated_at,
+      });
     } catch (error) {
       console.error('Error fetching user:', error);
       setUser(null);
-    } finally {
-      setIsLoading(false);
     }
   }, [supabase]);
 
   useEffect(() => {
-    fetchUser();
+    let mounted = true;
 
-    // Escuchar cambios en la autenticación
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted && session?.user) {
+          await fetchUser(session.user.id);
+        }
+      } catch (error) {
+        console.error('Auth init error:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
         if (event === 'SIGNED_IN' && session) {
-          await fetchUser();
+          await fetchUser(session.user.id);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
         }
@@ -76,15 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [supabase, fetchUser]);
 
-  const login = async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     try {
       setIsLoading(true);
-
-      // Autenticar con Supabase Auth usando el email generado
       const email = `${username.toLowerCase()}@nicmat.local`;
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -92,68 +111,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (authError) {
-        console.error('Auth error:', authError);
         return { success: false, error: ERROR_MESSAGES.INVALID_CREDENTIALS };
       }
 
-      // Buscar el usuario por auth_id después de autenticar
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
         .eq('auth_id', authData.user.id)
         .eq('is_active', true)
         .single();
 
       if (userError || !userData) {
-        console.error('User error:', userError);
         await supabase.auth.signOut();
         return { success: false, error: ERROR_MESSAGES.INVALID_CREDENTIALS };
       }
 
-      // Actualizar último login
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', userData.id);
+      // Actualizar último login en background
+      supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', userData.id).then(() => {});
 
-      await fetchUser();
+      setUser({
+        id: userData.id,
+        username: userData.username,
+        fullName: userData.full_name,
+        role: userData.role,
+        isActive: userData.is_active,
+        lastLogin: userData.last_login,
+        createdAt: userData.created_at,
+        updatedAt: userData.updated_at,
+      });
+
       return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
       return { success: false, error: ERROR_MESSAGES.GENERIC };
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
-  const logout = async () => {
-    try {
-      setIsLoading(true);
-      await supabase.auth.signOut();
-      setUser(null);
-      router.push(ROUTES.LOGIN);
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const logout = useCallback(async () => {
+    setUser(null);
+    await supabase.auth.signOut();
+    router.push(ROUTES.LOGIN);
+  }, [supabase, router]);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     await fetchUser();
-  };
+  }, [fetchUser]);
+
+  const value = useMemo(() => ({
+    user,
+    isLoading,
+    isAuthenticated: !!user,
+    login,
+    logout,
+    refreshUser,
+  }), [user, isLoading, login, logout, refreshUser]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
