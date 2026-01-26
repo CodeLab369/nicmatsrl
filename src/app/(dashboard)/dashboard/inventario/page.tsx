@@ -215,15 +215,8 @@ export default function InventarioPage() {
 
   // Descargar formato
   const handleDownloadFormat = () => {
-    const formatData = [{
-      'Marca': 'Ejemplo Marca',
-      'Amperaje': '12V 100Ah',
-      'Cantidad': 10,
-      'Costo': 150.00,
-      'Precio de Venta': 200.00,
-    }];
-
-    const ws = XLSX.utils.json_to_sheet(formatData);
+    const headers = ['Marca', 'Amperaje', 'Cantidad', 'Costo', 'Precio de Venta'];
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Formato');
     const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -524,11 +517,11 @@ export default function InventarioPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Marca</Label>
-                <Input placeholder="Ej: BOSCH" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
+                <Input placeholder="Ingresar Marca" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Amperaje</Label>
-                <Input placeholder="Ej: 12V 100Ah" value={formData.amperaje} onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} />
+                <Input placeholder="Ingresar Amperaje" value={formData.amperaje} onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -603,11 +596,11 @@ export default function InventarioPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Marca</Label>
-                <Input placeholder="Ej: BOSCH" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
+                <Input placeholder="Ingresar Marca" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Amperaje</Label>
-                <Input placeholder="Ej: 12V 100Ah" value={formData.amperaje} onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} />
+                <Input placeholder="Ingresar Amperaje" value={formData.amperaje} onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
