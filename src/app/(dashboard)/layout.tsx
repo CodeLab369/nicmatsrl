@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts';
 import { ROUTES } from '@/lib/constants';
@@ -14,36 +14,30 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push(ROUTES.LOGIN);
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.replace(ROUTES.LOGIN);
+      } else {
+        setShowContent(true);
+      }
     }
   }, [isLoading, isAuthenticated, router]);
 
-  // Mostrar loading mientras verifica autenticación
-  if (isLoading) {
+  // Solo mostrar loading brevemente al inicio
+  if (isLoading || !showContent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Cargando...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // No renderizar nada si no está autenticado
-  if (!isAuthenticated || !user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* Sidebar para desktop */}
       <Sidebar className="hidden lg:flex" />
-      
-      {/* Contenido principal */}
       <div className="lg:pl-72">
         <Header />
         <main className="p-4 md:p-6 lg:p-8">

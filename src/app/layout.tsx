@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   description: `Sistema de Gestión de Inventario y Cotizaciones - ${COMPANY.name}`,
   keywords: ['inventario', 'cotizaciones', 'baterías', 'NICMAT', 'gestión'],
   authors: [{ name: COMPANY.name }],
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/apple-touch-icon.svg',
+  },
   robots: {
     index: false,
     follow: false,

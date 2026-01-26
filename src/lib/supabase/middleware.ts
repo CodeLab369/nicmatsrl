@@ -57,8 +57,8 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refrescar sesión si ha expirado
-  await supabase.auth.getUser();
+  // Refrescar sesión en background (no bloqueante)
+  supabase.auth.getSession();
 
   return response;
 }
