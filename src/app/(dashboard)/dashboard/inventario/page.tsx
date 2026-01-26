@@ -53,6 +53,10 @@ export default function InventarioPage() {
   const [cantidadOp, setCantidadOp] = useState('');
   const [cantidadVal, setCantidadVal] = useState('');
   
+  // Opciones de filtros dinámicos
+  const [marcasOptions, setMarcasOptions] = useState<string[]>([]);
+  const [amperajesOptions, setAmperajesOptions] = useState<string[]>([]);
+  
   // Modales
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -68,6 +72,47 @@ export default function InventarioPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { toast } = useToast();
+
+  // Cargar marcas disponibles
+  const fetchMarcas = useCallback(async () => {
+    try {
+      const response = await fetch('/api/inventory?getMarcas=true');
+      const data = await response.json();
+      if (data.marcas) {
+        setMarcasOptions(data.marcas);
+      }
+    } catch (error) {
+      console.error('Error fetching marcas:', error);
+    }
+  }, []);
+
+  // Cargar amperajes por marca
+  const fetchAmperajes = useCallback(async (marca: string) => {
+    if (!marca) {
+      setAmperajesOptions([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/inventory?getAmperajes=true&marca=${encodeURIComponent(marca)}`);
+      const data = await response.json();
+      if (data.amperajes) {
+        setAmperajesOptions(data.amperajes);
+      }
+    } catch (error) {
+      console.error('Error fetching amperajes:', error);
+    }
+  }, []);
+
+  // Cargar marcas al inicio
+  useEffect(() => {
+    fetchMarcas();
+  }, [fetchMarcas]);
+
+  // Cargar amperajes cuando cambia la marca
+  useEffect(() => {
+    fetchAmperajes(filterMarca);
+    setFilterAmperaje(''); // Reset amperaje cuando cambia la marca
+  }, [filterMarca, fetchAmperajes]);
 
   // Cargar inventario
   const fetchInventory = useCallback(async () => {
@@ -127,6 +172,7 @@ export default function InventarioPage() {
       setAddDialogOpen(false);
       setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' });
       fetchInventory();
+      fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo agregar el producto', variant: 'destructive' });
     } finally {
@@ -150,6 +196,7 @@ export default function InventarioPage() {
       toast({ title: 'Éxito', description: 'Producto actualizado correctamente', variant: 'success' });
       setEditDialogOpen(false);
       fetchInventory();
+      fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo actualizar el producto', variant: 'destructive' });
     } finally {
@@ -168,11 +215,20 @@ export default function InventarioPage() {
       toast({ title: 'Éxito', description: 'Producto eliminado correctamente', variant: 'success' });
       setDeleteDialogOpen(false);
       fetchInventory();
+      fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo eliminar el producto', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilterMarca('');
+    setFilterAmperaje('');
+    setCantidadOp('');
+    setCantidadVal('');
   };
 
   // Vaciar inventario
@@ -184,7 +240,9 @@ export default function InventarioPage() {
       
       toast({ title: 'Éxito', description: 'Inventario vaciado correctamente', variant: 'success' });
       setClearDialogOpen(false);
+      clearFilters();
       fetchInventory();
+      fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo vaciar el inventario', variant: 'destructive' });
     } finally {
@@ -255,6 +313,7 @@ export default function InventarioPage() {
         
         toast({ title: 'Éxito', description: `Se importaron ${result.count} productos`, variant: 'success' });
         fetchInventory();
+        fetchMarcas();
       } catch {
         toast({ title: 'Error', description: 'Error al importar el archivo', variant: 'destructive' });
       }
@@ -273,14 +332,6 @@ export default function InventarioPage() {
       precioVenta: item.precio_venta.toString(),
     });
     setEditDialogOpen(true);
-  };
-
-  const clearFilters = () => {
-    setSearch('');
-    setFilterMarca('');
-    setFilterAmperaje('');
-    setCantidadOp('');
-    setCantidadVal('');
   };
 
   return (
@@ -368,26 +419,38 @@ export default function InventarioPage() {
                 />
               </div>
             </div>
-            <Input
-              placeholder="Filtrar por marca"
-              value={filterMarca}
-              onChange={(e) => setFilterMarca(e.target.value)}
-            />
-            <Input
-              placeholder="Filtrar por amperaje"
-              value={filterAmperaje}
-              onChange={(e) => setFilterAmperaje(e.target.value)}
-            />
+            <Select value={filterMarca} onValueChange={setFilterMarca}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas las marcas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todas las marcas</SelectItem>
+                {marcasOptions.map((marca) => (
+                  <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterAmperaje} onValueChange={setFilterAmperaje} disabled={!filterMarca}>
+              <SelectTrigger>
+                <SelectValue placeholder={filterMarca ? "Todos los amperajes" : "Seleccione marca"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los amperajes</SelectItem>
+                {amperajesOptions.map((amp) => (
+                  <SelectItem key={amp} value={amp}>{amp}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={cantidadOp} onValueChange={setCantidadOp}>
               <SelectTrigger>
                 <SelectValue placeholder="Cantidad..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="eq">Igual a</SelectItem>
-                <SelectItem value="gt">Mayor que</SelectItem>
-                <SelectItem value="lt">Menor que</SelectItem>
-                <SelectItem value="gte">Mayor o igual</SelectItem>
-                <SelectItem value="lte">Menor o igual</SelectItem>
+                <SelectItem value="eq">=  Igual a</SelectItem>
+                <SelectItem value="gt">&gt;  Mayor que</SelectItem>
+                <SelectItem value="lt">&lt;  Menor que</SelectItem>
+                <SelectItem value="gte">≥  Mayor o igual</SelectItem>
+                <SelectItem value="lte">≤  Menor o igual</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex gap-2">

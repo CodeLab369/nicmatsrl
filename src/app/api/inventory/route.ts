@@ -17,49 +17,61 @@ export async function GET(request: NextRequest) {
     const amperaje = searchParams.get('amperaje') || '';
     const cantidadOp = searchParams.get('cantidadOp') || '';
     const cantidadVal = searchParams.get('cantidadVal') || '';
+    const getMarcas = searchParams.get('getMarcas') === 'true';
+    const getAmperajes = searchParams.get('getAmperajes') === 'true';
+
+    // Obtener marcas únicas
+    if (getMarcas) {
+      const { data } = await supabase
+        .from('inventory')
+        .select('marca')
+        .order('marca');
+      const uniqueMarcas = Array.from(new Set(data?.map(item => item.marca) || []));
+      return NextResponse.json({ marcas: uniqueMarcas });
+    }
+
+    // Obtener amperajes por marca
+    if (getAmperajes && marca) {
+      const { data } = await supabase
+        .from('inventory')
+        .select('amperaje')
+        .eq('marca', marca)
+        .order('amperaje');
+      const uniqueAmperajes = Array.from(new Set(data?.map(item => item.amperaje) || []));
+      return NextResponse.json({ amperajes: uniqueAmperajes });
+    }
 
     const offset = (page - 1) * limit;
+
+    // Función para aplicar filtros a una query
+    const applyFilters = (query: any) => {
+      if (search) {
+        query = query.or(`marca.ilike.%${search}%,amperaje.ilike.%${search}%`);
+      }
+      if (marca) {
+        query = query.eq('marca', marca);
+      }
+      if (amperaje) {
+        query = query.eq('amperaje', amperaje);
+      }
+      if (cantidadOp && cantidadVal) {
+        const val = parseInt(cantidadVal);
+        switch (cantidadOp) {
+          case 'eq': query = query.eq('cantidad', val); break;
+          case 'gt': query = query.gt('cantidad', val); break;
+          case 'lt': query = query.lt('cantidad', val); break;
+          case 'gte': query = query.gte('cantidad', val); break;
+          case 'lte': query = query.lte('cantidad', val); break;
+        }
+      }
+      return query;
+    };
 
     let query = supabase
       .from('inventory')
       .select('*', { count: 'exact' });
 
-    // Búsqueda general
-    if (search) {
-      query = query.or(`marca.ilike.%${search}%,amperaje.ilike.%${search}%`);
-    }
-
-    // Filtro por marca
-    if (marca) {
-      query = query.ilike('marca', `%${marca}%`);
-    }
-
-    // Filtro por amperaje
-    if (amperaje) {
-      query = query.ilike('amperaje', `%${amperaje}%`);
-    }
-
-    // Filtro por cantidad
-    if (cantidadOp && cantidadVal) {
-      const val = parseInt(cantidadVal);
-      switch (cantidadOp) {
-        case 'eq':
-          query = query.eq('cantidad', val);
-          break;
-        case 'gt':
-          query = query.gt('cantidad', val);
-          break;
-        case 'lt':
-          query = query.lt('cantidad', val);
-          break;
-        case 'gte':
-          query = query.gte('cantidad', val);
-          break;
-        case 'lte':
-          query = query.lte('cantidad', val);
-          break;
-      }
-    }
+    query = applyFilters(query);
 
     const { data, error, count } = await query
       .order('created_at', { ascending: false })
@@ -67,10 +79,13 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Obtener estadísticas
-    const { data: statsData } = await supabase
+    // Obtener estadísticas CON los mismos filtros aplicados
+    let statsQuery = supabase
       .from('inventory')
       .select('cantidad, costo, precio_venta');
+    
+    statsQuery = applyFilters(statsQuery);
+    const { data: statsData } = await statsQuery;
 
     const stats = {
       productos: statsData?.length || 0,
