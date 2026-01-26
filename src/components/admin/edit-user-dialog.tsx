@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
@@ -44,7 +43,6 @@ export function EditUserDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const supabase = createBrowserClient();
 
   const {
     register,
@@ -82,42 +80,28 @@ export function EditUserDialog({
     try {
       setIsSubmitting(true);
 
-      // Verificar si el nuevo username ya está en uso por otro usuario
-      if (data.username !== user.username) {
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('username', data.username)
-          .neq('id', user.id)
-          .single();
-
-        if (existingUser) {
-          toast({
-            title: 'Error',
-            description: 'El nombre de usuario ya está en uso',
-            variant: 'destructive',
-          });
-          return;
-        }
-      }
-
-      // Actualizar usuario en la tabla users
-      const { error: userError } = await supabase
-        .from('users')
-        .update({
+      // Usar la API para actualizar el usuario
+      const response = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: user.id,
           username: data.username,
-          full_name: data.fullName,
+          fullName: data.fullName,
           role: data.role,
-          is_active: data.isActive,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+          isActive: data.isActive,
+          newPassword: data.newPassword || undefined,
+        }),
+      });
 
-      if (userError) {
-        console.error('User update error:', userError);
+      const result = await response.json();
+
+      if (!response.ok) {
         toast({
           title: 'Error',
-          description: 'No se pudo actualizar el usuario',
+          description: result.error || 'No se pudo actualizar el usuario',
           variant: 'destructive',
         });
         return;

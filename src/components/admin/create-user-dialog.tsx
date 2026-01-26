@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { createUserSchema, CreateUserFormData } from '@/lib/validations';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, USER_ROLES } from '@/lib/constants';
@@ -40,7 +39,6 @@ export function CreateUserDialog({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const supabase = createBrowserClient();
 
   const {
     register,
@@ -66,53 +64,26 @@ export function CreateUserDialog({
     try {
       setIsSubmitting(true);
 
-      // Verificar si el usuario ya existe
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', data.username)
-        .single();
-
-      if (existingUser) {
-        toast({
-          title: 'Error',
-          description: 'El nombre de usuario ya está en uso',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Crear usuario en Supabase Auth
-      const email = `${data.username.toLowerCase()}@nicmat.local`;
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password: data.password,
+      // Usar la API para crear el usuario
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: data.username,
+          password: data.password,
+          fullName: data.fullName,
+          role: data.role,
+        }),
       });
 
-      if (authError) {
-        console.error('Auth error:', authError);
+      const result = await response.json();
+
+      if (!response.ok) {
         toast({
           title: 'Error',
-          description: 'No se pudo crear el usuario en el sistema de autenticación',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Crear usuario en la tabla users
-      const { error: userError } = await supabase.from('users').insert({
-        auth_id: authData.user?.id,
-        username: data.username,
-        full_name: data.fullName,
-        role: data.role,
-        is_active: true,
-      });
-
-      if (userError) {
-        console.error('User error:', userError);
-        toast({
-          title: 'Error',
-          description: 'No se pudo crear el perfil del usuario',
+          description: result.error || 'No se pudo crear el usuario',
           variant: 'destructive',
         });
         return;

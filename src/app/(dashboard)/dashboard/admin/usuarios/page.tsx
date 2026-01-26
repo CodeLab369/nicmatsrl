@@ -126,12 +126,16 @@ export default function UsersPage() {
         return;
       }
 
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', selectedUser.id);
+      // Usar la API para eliminar el usuario
+      const response = await fetch(`/api/users?id=${selectedUser.id}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al eliminar');
+      }
 
       toast({
         title: 'Éxito',
