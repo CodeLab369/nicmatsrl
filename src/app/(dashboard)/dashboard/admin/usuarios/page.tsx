@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon } from 'lucide-react';
 import { createBrowserClient } from '@/lib/supabase';
 import { useAuth } from '@/contexts';
@@ -32,7 +32,6 @@ import { useRouter } from 'next/navigation';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -44,7 +43,7 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const supabase = createBrowserClient();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   // Verificar rol admin
   useEffect(() => {
@@ -53,13 +52,13 @@ export default function UsersPage() {
     }
   }, [currentUser, router]);
 
-  // Cargar usuarios
+  // Cargar usuarios - optimizado
   const fetchUsers = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -76,7 +75,6 @@ export default function UsersPage() {
       }));
 
       setUsers(mappedUsers);
-      setFilteredUsers(mappedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -93,20 +91,17 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Filtrar usuarios
-  useEffect(() => {
+  // Filtrar usuarios con useMemo para evitar re-renders
+  const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) {
-      setFilteredUsers(users);
-    } else {
-      const query = searchQuery.toLowerCase();
-      setFilteredUsers(
-        users.filter(
-          (u) =>
-            u.username.toLowerCase().includes(query) ||
-            u.fullName.toLowerCase().includes(query)
-        )
-      );
+      return users;
     }
+    const query = searchQuery.toLowerCase();
+    return users.filter(
+      (u) =>
+        u.username.toLowerCase().includes(query) ||
+        u.fullName.toLowerCase().includes(query)
+    );
   }, [searchQuery, users]);
 
   // Eliminar usuario

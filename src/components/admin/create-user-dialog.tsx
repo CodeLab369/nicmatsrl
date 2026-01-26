@@ -133,7 +133,7 @@ export function CreateUserDialog({
             </Label>
             <Input
               id="fullName"
-              placeholder="Ej: Juan Pérez"
+              placeholder="Ingrese nombre completo"
               {...register('fullName')}
               error={errors.fullName?.message}
               disabled={isSubmitting}
