@@ -1008,10 +1008,10 @@ export default function CotizacionesPage() {
   // Badge de estado
   const getEstadoBadge = (estado: string) => {
     const config: Record<string, { color: string; label: string }> = {
-      pendiente: { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Pendiente' },
-      aceptada: { color: 'bg-green-100 text-green-700 border-green-200', label: 'Aceptada' },
-      convertida: { color: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Convertida a Venta' },
-      rechazada: { color: 'bg-red-100 text-red-700 border-red-200', label: 'Rechazada' },
+      pendiente: { color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30', label: 'Pendiente' },
+      aceptada: { color: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30', label: 'Aceptada' },
+      convertida: { color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30', label: 'Convertida a Venta' },
+      rechazada: { color: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30', label: 'Rechazada' },
     };
     const { color, label } = config[estado] || config.pendiente;
     return <Badge className={`${color} border`}>{label}</Badge>;
@@ -1026,7 +1026,7 @@ export default function CotizacionesPage() {
           <p className="text-muted-foreground">Crea y gestiona cotizaciones para tus clientes</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-600' : 'text-gray-400'}`}>
+          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-500' : 'text-muted-foreground'}`}>
             {isConnected ? <RefreshCw className="h-3 w-3" /> : <RefreshCw className="h-3 w-3" />}
             {isConnected ? 'Conectado' : 'Sin conexión'}
           </div>
@@ -1076,10 +1076,10 @@ export default function CotizacionesPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-soft border-l-4 border-l-gray-500">
+        <Card className="shadow-soft border-l-4 border-l-muted-foreground">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-gray-500" />
+              <FileText className="h-8 w-8 text-muted-foreground" />
               <div>
                 <p className="text-2xl font-bold">{stats.total}</p>
                 <p className="text-sm text-muted-foreground">Total</p>
@@ -1450,7 +1450,7 @@ export default function CotizacionesPage() {
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
-                                  className="h-8 w-8 text-green-600"
+                                  className="h-8 w-8 text-green-500 hover:text-green-600"
                                   onClick={() => handleCambiarEstado(cot.id, 'aceptada')}
                                 >
                                   <Check className="h-4 w-4" />
@@ -1458,7 +1458,7 @@ export default function CotizacionesPage() {
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
-                                  className="h-8 w-8 text-red-600"
+                                  className="h-8 w-8 text-red-500 hover:text-red-600"
                                   onClick={() => handleCambiarEstado(cot.id, 'rechazada')}
                                 >
                                   <X className="h-4 w-4" />
@@ -1591,7 +1591,7 @@ export default function CotizacionesPage() {
                     <span>{formatCurrency(selectedCotizacion.subtotal)}</span>
                   </div>
                   {selectedCotizacion.descuento > 0 && (
-                    <div className="flex justify-between text-sm text-red-600">
+                    <div className="flex justify-between text-sm text-red-500">
                       <span>Descuento:</span>
                       <span>- {formatCurrency(selectedCotizacion.descuento)}</span>
                     </div>

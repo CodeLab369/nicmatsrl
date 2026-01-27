@@ -1124,7 +1124,7 @@ export default function InventarioPage() {
                 </Card>
                 <Card className="border-green-200 dark:border-green-800">
                   <CardContent className="pt-4 text-center">
-                    <div className="text-3xl font-bold text-green-600">{importAnalysis.new}</div>
+                    <div className="text-3xl font-bold text-green-500">{importAnalysis.new}</div>
                     <p className="text-sm text-muted-foreground">Productos Nuevos</p>
                   </CardContent>
                 </Card>
@@ -1184,7 +1184,7 @@ export default function InventarioPage() {
               {/* Preview de nuevos */}
               {importAnalysis.new > 0 && importAnalysis.newItems?.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-green-600">Productos nuevos (preview):</h4>
+                  <h4 className="font-medium text-green-500">Productos nuevos (preview):</h4>
                   <div className="max-h-32 overflow-y-auto text-sm">
                     {importAnalysis.newItems.map((item: any, i: number) => (
                       <div key={i} className="py-1 border-b last:border-0">

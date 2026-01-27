@@ -189,7 +189,7 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-600' : 'text-gray-400'}`}>
+          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-500' : 'text-muted-foreground'}`}>
             <RefreshCw className={`h-3 w-3 ${isConnected ? '' : 'animate-spin'}`} />
             {isConnected ? 'Tiempo real' : 'Conectando...'}
           </div>

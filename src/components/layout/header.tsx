@@ -18,6 +18,7 @@ import {
   Badge,
 } from '@/components/ui';
 import { Sidebar } from './sidebar';
+import { ThemeToggle } from '@/components/theme-toggle';
 import Link from 'next/link';
 
 export function Header() {
@@ -63,8 +64,11 @@ export function Header() {
             {/* Espacio reservado para breadcrumbs o título dinámico */}
           </div>
 
-          {/* Usuario y menú */}
-          <DropdownMenu>
+          {/* Toggle de tema y Usuario */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -117,6 +121,7 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </header>
 

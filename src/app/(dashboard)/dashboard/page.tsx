@@ -93,7 +93,7 @@ export default function DashboardPage() {
       value: loading ? '...' : stats.productos.toString(),
       description: `${stats.unidadesTotal} unidades totales`,
       icon: Package,
-      color: 'text-blue-600 bg-blue-100',
+      color: 'text-blue-500 bg-blue-500/15 dark:bg-blue-500/20',
       href: '/dashboard/inventario',
     },
     {
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       value: loading ? '...' : stats.cotizacionesTotal.toString(),
       description: `${stats.cotizacionesPendientes} pendientes`,
       icon: FileText,
-      color: 'text-green-600 bg-green-100',
+      color: 'text-green-500 bg-green-500/15 dark:bg-green-500/20',
       href: '/dashboard/cotizaciones',
     },
     {
@@ -109,7 +109,7 @@ export default function DashboardPage() {
       value: loading ? '...' : stats.usuarios.toString(),
       description: 'En el sistema',
       icon: Users,
-      color: 'text-purple-600 bg-purple-100',
+      color: 'text-purple-500 bg-purple-500/15 dark:bg-purple-500/20',
       href: '/dashboard/admin/usuarios',
     },
     {
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       value: loading ? '...' : formatCurrency(stats.valorInventario),
       description: `Venta: ${formatCurrency(stats.valorVenta)}`,
       icon: TrendingUp,
-      color: 'text-amber-600 bg-amber-100',
+      color: 'text-amber-500 bg-amber-500/15 dark:bg-amber-500/20',
       href: '/dashboard/inventario',
     },
   ];
@@ -184,8 +184,8 @@ export default function DashboardPage() {
                 </div>
               </Link>
               <Link href="/dashboard/cotizaciones">
-                <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-green-500/20 bg-green-50 hover:bg-green-100 transition-colors cursor-pointer">
-                  <FileText className="h-8 w-8 text-green-600 mb-2" />
+                <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-colors cursor-pointer">
+                  <FileText className="h-8 w-8 text-green-500 mb-2" />
                   <span className="text-sm font-medium">Cotizaciones</span>
                   <span className="text-xs text-muted-foreground">{stats.cotizacionesTotal} totales</span>
                 </div>

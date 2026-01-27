@@ -27,25 +27,42 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Fondo gris oscuro elegante */
+    --background: 220 14% 10%;
+    --foreground: 210 20% 95%;
+    
+    /* Cards con ligero contraste */
+    --card: 220 13% 14%;
+    --card-foreground: 210 20% 95%;
+    
+    /* Popovers y dropdowns */
+    --popover: 220 13% 14%;
+    --popover-foreground: 210 20% 95%;
+    
+    /* Primary - Azul brillante para destacar */
+    --primary: 217 91% 60%;
+    --primary-foreground: 220 14% 10%;
+    
+    /* Secondary - Gris medio */
+    --secondary: 220 13% 20%;
+    --secondary-foreground: 210 20% 95%;
+    
+    /* Muted - Para textos secundarios */
+    --muted: 220 13% 18%;
+    --muted-foreground: 215 15% 65%;
+    
+    /* Accent - Para hovers y selecciones */
+    --accent: 220 13% 22%;
+    --accent-foreground: 210 20% 95%;
+    
+    /* Destructive - Rojo visible */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 20% 95%;
+    
+    /* Borders e inputs más visibles */
+    --border: 220 13% 25%;
+    --input: 220 13% 22%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -83,14 +100,23 @@
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* Gradiente de fondo para el login */
+  /* Gradiente de fondo para el login - modo claro */
   .bg-gradient-nicmat {
     background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #1e40af 100%);
+  }
+  
+  /* Gradiente de fondo para el login - modo oscuro */
+  .dark .bg-gradient-nicmat {
+    background: linear-gradient(135deg, hsl(220, 14%, 10%) 0%, hsl(220, 13%, 18%) 50%, hsl(220, 14%, 10%) 100%);
   }
 
   /* Sombra suave para cards */
   .shadow-soft {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+  
+  .dark .shadow-soft {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
   }
 }
 
