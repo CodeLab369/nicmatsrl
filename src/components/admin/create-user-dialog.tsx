@@ -147,7 +147,7 @@ export function CreateUserDialog({
             </Label>
             <Input
               id="username"
-              placeholder="Ej: jperez"
+              placeholder="Ingrese usuario"
               {...register('username')}
               error={errors.username?.message}
               disabled={isSubmitting}

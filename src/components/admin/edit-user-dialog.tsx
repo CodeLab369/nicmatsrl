@@ -166,7 +166,7 @@ export function EditUserDialog({
             </Label>
             <Input
               id="edit-username"
-              placeholder="Ej: jperez"
+              placeholder="Ingrese usuario"
               {...register('username')}
               error={errors.username?.message}
               disabled={isSubmitting}
