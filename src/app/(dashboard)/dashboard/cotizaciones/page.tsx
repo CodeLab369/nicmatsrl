@@ -1777,7 +1777,7 @@ export default function CotizacionesPage() {
                     id="cfg-nombre"
                     value={configForm.nombre}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, nombre: e.target.value }))}
-                    placeholder="NICMAT S.R.L."
+                    placeholder="Ingrese nombre de la empresa"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1786,7 +1786,7 @@ export default function CotizacionesPage() {
                     id="cfg-nit"
                     value={configForm.nit}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, nit: e.target.value }))}
-                    placeholder="123456789"
+                    placeholder="Ingrese NIT"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
@@ -1795,7 +1795,7 @@ export default function CotizacionesPage() {
                     id="cfg-direccion"
                     value={configForm.direccion}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, direccion: e.target.value }))}
-                    placeholder="Av. Principal #123, Zona Central"
+                    placeholder="Ingrese dirección"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1804,7 +1804,7 @@ export default function CotizacionesPage() {
                     id="cfg-ciudad"
                     value={configForm.ciudad}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, ciudad: e.target.value }))}
-                    placeholder="Santa Cruz - Bolivia"
+                    placeholder="Ingrese ciudad"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1814,7 +1814,7 @@ export default function CotizacionesPage() {
                     type="email"
                     value={configForm.email}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="info@empresa.com"
+                    placeholder="Ingrese correo electrónico"
                   />
                 </div>
               </div>
@@ -1834,7 +1834,7 @@ export default function CotizacionesPage() {
                     id="cfg-tel1"
                     value={configForm.telefono_principal}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_principal: e.target.value }))}
-                    placeholder="+591 3 123-4567"
+                    placeholder="Ingrese teléfono principal"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1843,7 +1843,7 @@ export default function CotizacionesPage() {
                     id="cfg-tel2"
                     value={configForm.telefono_secundario}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_secundario: e.target.value }))}
-                    placeholder="+591 70012345"
+                    placeholder="Ingrese teléfono secundario"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1852,7 +1852,7 @@ export default function CotizacionesPage() {
                     id="cfg-tel3"
                     value={configForm.telefono_adicional}
                     onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_adicional: e.target.value }))}
-                    placeholder="+591 70000000"
+                    placeholder="Ingrese teléfono adicional"
                   />
                 </div>
               </div>
