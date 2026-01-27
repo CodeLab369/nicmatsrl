@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
-  ChevronLeft, ChevronRight, X, Wifi, WifiOff
+  ChevronLeft, ChevronRight, X, Wifi, WifiOff, RefreshCw, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -87,6 +87,11 @@ export default function InventarioPage() {
     marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Detección de producto existente al agregar
+  const [existingProduct, setExistingProduct] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [addMode, setAddMode] = useState<'new' | 'restock'>('new');
   
   const { toast } = useToast();
 
@@ -207,25 +212,101 @@ export default function InventarioPage() {
     setPage(1);
   }, [search, filterMarca, filterAmperaje, cantidadOp, cantidadVal, limit]);
 
-  // Agregar producto
+  // Buscar producto existente por marca y amperaje
+  const searchExistingProduct = useCallback(async (marca: string, amperaje: string) => {
+    if (!marca.trim() || !amperaje.trim()) {
+      setExistingProduct(null);
+      setAddMode('new');
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `/api/inventory?searchExact=true&marca=${encodeURIComponent(marca.trim())}&amperaje=${encodeURIComponent(amperaje.trim())}`
+      );
+      const data = await response.json();
+      
+      if (data.product) {
+        setExistingProduct(data.product);
+        setAddMode('restock');
+        // Auto-rellenar costo y precio de venta del producto existente
+        setFormData(prev => ({
+          ...prev,
+          costo: data.product.costo.toString(),
+          precioVenta: data.product.precio_venta.toString()
+        }));
+      } else {
+        setExistingProduct(null);
+        setAddMode('new');
+      }
+    } catch (error) {
+      console.error('Error searching product:', error);
+      setExistingProduct(null);
+      setAddMode('new');
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Efecto para buscar producto cuando cambia marca o amperaje en el formulario de agregar
+  useEffect(() => {
+    if (addDialogOpen) {
+      const timer = setTimeout(() => {
+        searchExistingProduct(formData.marca, formData.amperaje);
+      }, 500); // Debounce de 500ms
+      return () => clearTimeout(timer);
+    }
+  }, [formData.marca, formData.amperaje, addDialogOpen, searchExistingProduct]);
+
+  // Agregar producto o reabastecer
   const handleAdd = async () => {
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) throw new Error();
       
-      toast({ title: 'Éxito', description: 'Producto agregado correctamente', variant: 'success' });
+      if (addMode === 'restock' && existingProduct) {
+        // Reabastecer producto existente
+        const response = await fetch('/api/inventory', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: existingProduct.id,
+            marca: formData.marca,
+            amperaje: formData.amperaje,
+            cantidad: existingProduct.cantidad + parseInt(formData.cantidad || '0'), // Sumar cantidad
+            costo: formData.costo,
+            precioVenta: formData.precioVenta
+          }),
+        });
+
+        if (!response.ok) throw new Error();
+        
+        toast({ 
+          title: 'Éxito', 
+          description: `Stock actualizado: +${formData.cantidad} unidades (Total: ${existingProduct.cantidad + parseInt(formData.cantidad || '0')})`, 
+          variant: 'success' 
+        });
+      } else {
+        // Crear nuevo producto
+        const response = await fetch('/api/inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) throw new Error();
+        
+        toast({ title: 'Éxito', description: 'Producto agregado correctamente', variant: 'success' });
+      }
+      
       setAddDialogOpen(false);
       setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' });
+      setExistingProduct(null);
+      setAddMode('new');
       fetchInventory();
       fetchMarcas();
     } catch {
-      toast({ title: 'Error', description: 'No se pudo agregar el producto', variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo procesar la operación', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -680,54 +761,167 @@ export default function InventarioPage() {
       </Card>
 
       {/* Dialog Agregar */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+        setAddDialogOpen(open);
+        if (!open) {
+          setExistingProduct(null);
+          setAddMode('new');
+          setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' });
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Agregar Producto</DialogTitle>
-            <DialogDescription>Ingresa los datos del nuevo producto</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              {addMode === 'restock' ? (
+                <>
+                  <RefreshCw className="h-5 w-5 text-blue-500" />
+                  Reabastecer Producto
+                </>
+              ) : (
+                <>
+                  <Plus className="h-5 w-5 text-green-500" />
+                  Agregar Producto
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {addMode === 'restock' 
+                ? 'Producto existente detectado. La cantidad se sumará al stock actual.'
+                : 'Ingresa los datos del nuevo producto'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Marca</Label>
-                <Input placeholder="Ingresar Marca" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
+                <Input 
+                  placeholder="Ingresar Marca" 
+                  value={formData.marca} 
+                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Amperaje</Label>
-                <Input placeholder="Ingresar Amperaje" value={formData.amperaje} onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} />
+                <div className="relative">
+                  <Input 
+                    placeholder="Ingresar Amperaje" 
+                    value={formData.amperaje} 
+                    onChange={(e) => setFormData({ ...formData, amperaje: e.target.value })} 
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+            
+            {/* Indicador de producto existente */}
+            {existingProduct && addMode === 'restock' && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium text-blue-700 dark:text-blue-300">Producto encontrado en inventario</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Stock actual:</span>
+                    <p className="font-bold text-lg">{existingProduct.cantidad}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Costo actual:</span>
+                    <p className="font-medium">{formatCurrency(existingProduct.costo)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Precio venta:</span>
+                    <p className="font-medium">{formatCurrency(existingProduct.precio_venta)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Cantidad</Label>
-                <Input type="number" placeholder="0" value={formData.cantidad} onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })} />
+                <Label>{addMode === 'restock' ? 'Cantidad a agregar' : 'Cantidad'}</Label>
+                <Input 
+                  type="number" 
+                  placeholder="0" 
+                  value={formData.cantidad} 
+                  onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Costo (Bs.)</Label>
-                <Input type="number" step="0.01" placeholder="0.00" value={formData.costo} onChange={(e) => setFormData({ ...formData, costo: e.target.value })} />
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  placeholder="0.00" 
+                  value={formData.costo} 
+                  onChange={(e) => setFormData({ ...formData, costo: e.target.value })} 
+                />
               </div>
               <div className="space-y-2">
                 <Label>Precio Venta (Bs.)</Label>
-                <Input type="number" step="0.01" placeholder="0.00" value={formData.precioVenta} onChange={(e) => setFormData({ ...formData, precioVenta: e.target.value })} />
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  placeholder="0.00" 
+                  value={formData.precioVenta} 
+                  onChange={(e) => setFormData({ ...formData, precioVenta: e.target.value })} 
+                />
               </div>
             </div>
-            {formData.cantidad && formData.costo && (
-              <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded-lg">
-                <div>
-                  <span className="text-sm text-muted-foreground">Costo Total:</span>
-                  <p className="font-bold">{formatCurrency(parseFloat(formData.cantidad || '0') * parseFloat(formData.costo || '0'))}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Costo Venta:</span>
-                  <p className="font-bold">{formatCurrency(parseFloat(formData.cantidad || '0') * parseFloat(formData.precioVenta || '0'))}</p>
-                </div>
+            
+            {/* Preview del resultado */}
+            {formData.cantidad && (
+              <div className={`p-3 rounded-lg ${addMode === 'restock' ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-muted'}`}>
+                {addMode === 'restock' && existingProduct ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                      <ArrowRight className="h-4 w-4" />
+                      <span className="font-medium">Resultado después del reabastecimiento:</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Stock final:</span>
+                        <p className="font-bold text-lg text-green-600 dark:text-green-400">
+                          {existingProduct.cantidad + parseInt(formData.cantidad || '0')} unidades
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Costo Total:</span>
+                        <p className="font-bold">{formatCurrency((existingProduct.cantidad + parseInt(formData.cantidad || '0')) * parseFloat(formData.costo || '0'))}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Valor Venta:</span>
+                        <p className="font-bold">{formatCurrency((existingProduct.cantidad + parseInt(formData.cantidad || '0')) * parseFloat(formData.precioVenta || '0'))}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Costo Total:</span>
+                      <p className="font-bold">{formatCurrency(parseFloat(formData.cantidad || '0') * parseFloat(formData.costo || '0'))}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Valor Venta:</span>
+                      <p className="font-bold">{formatCurrency(parseFloat(formData.cantidad || '0') * parseFloat(formData.precioVenta || '0'))}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleAdd} disabled={isSubmitting || !formData.marca || !formData.amperaje}>
-              {isSubmitting ? 'Guardando...' : 'Guardar'}
+            <Button 
+              onClick={handleAdd} 
+              disabled={isSubmitting || !formData.marca || !formData.amperaje || !formData.cantidad}
+              className={addMode === 'restock' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+            >
+              {isSubmitting ? 'Guardando...' : addMode === 'restock' ? 'Reabastecer' : 'Guardar'}
             </Button>
           </DialogFooter>
         </DialogContent>

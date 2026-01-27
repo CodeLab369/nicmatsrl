@@ -19,6 +19,19 @@ export async function GET(request: NextRequest) {
     const cantidadVal = searchParams.get('cantidadVal') || '';
     const getMarcas = searchParams.get('getMarcas') === 'true';
     const getAmperajes = searchParams.get('getAmperajes') === 'true';
+    const searchExact = searchParams.get('searchExact') === 'true';
+
+    // Buscar producto exacto por marca y amperaje (para detección de existentes)
+    if (searchExact && marca && amperaje) {
+      const { data } = await supabase
+        .from('inventory')
+        .select('*')
+        .ilike('marca', marca)
+        .ilike('amperaje', amperaje)
+        .limit(1);
+      
+      return NextResponse.json({ product: data?.[0] || null });
+    }
 
     // Obtener marcas únicas
     if (getMarcas) {
