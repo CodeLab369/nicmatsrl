@@ -127,7 +127,7 @@ export default function DashboardPage() {
       {/* Bienvenida */}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-3xl font-bold">
-          ¡Bienvenido, {user?.fullName}!
+          ¡Bienvenido/a, {user?.fullName}!
         </h1>
         <p className="text-muted-foreground">
           Panel de control de {COMPANY.name} - {COMPANY.description}
