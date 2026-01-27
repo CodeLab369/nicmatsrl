@@ -140,7 +140,7 @@ export function EditUserDialog({
         <DialogHeader>
           <DialogTitle>Editar Usuario</DialogTitle>
           <DialogDescription>
-            Modifique los datos del usuario @{user.username}
+            Modifique los datos del usuario {user.username}
           </DialogDescription>
         </DialogHeader>
 

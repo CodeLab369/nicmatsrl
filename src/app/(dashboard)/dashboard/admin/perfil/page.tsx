@@ -190,7 +190,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Usuario</p>
-              <p className="font-medium">@{user.username}</p>
+              <p className="font-medium">{user.username}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Rol</p>

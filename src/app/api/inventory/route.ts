@@ -107,6 +107,16 @@ export async function GET(request: NextRequest) {
       valorVenta: statsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0) || 0,
     };
 
+    // Obtener totales globales (sin filtros) para el Dashboard
+    const { data: globalStatsData } = await supabase
+      .from('inventory')
+      .select('cantidad, costo, precio_venta');
+    
+    const totalProducts = globalStatsData?.length || 0;
+    const totalUnits = globalStatsData?.reduce((acc, item) => acc + (item.cantidad || 0), 0) || 0;
+    const totalCost = globalStatsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0) || 0;
+    const totalSaleValue = globalStatsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0) || 0;
+
     return NextResponse.json({
       items: data || [],
       total: count || 0,
@@ -114,6 +124,11 @@ export async function GET(request: NextRequest) {
       limit,
       totalPages: Math.ceil((count || 0) / limit),
       stats,
+      // Estadísticas globales para el Dashboard
+      totalProducts,
+      totalUnits,
+      totalCost,
+      totalSaleValue,
     });
   } catch (error) {
     console.error('Error fetching inventory:', error);

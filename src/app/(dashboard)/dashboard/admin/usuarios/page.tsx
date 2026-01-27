@@ -262,7 +262,7 @@ export default function UsersPage() {
                     <tr key={user.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-2">
                         <div className="flex flex-col">
-                          <span className="font-medium">@{user.username}</span>
+                          <span className="font-medium">{user.username}</span>
                           <span className="text-sm text-muted-foreground sm:hidden">
                             {user.fullName}
                           </span>

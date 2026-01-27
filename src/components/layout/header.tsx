@@ -78,7 +78,7 @@ export function Header() {
                 <div className="hidden md:flex flex-col items-start">
                   <span className="text-sm font-medium">{user?.fullName}</span>
                   <span className="text-xs text-muted-foreground">
-                    @{user?.username}
+                    {user?.username}
                   </span>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />
@@ -88,7 +88,7 @@ export function Header() {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-2">
                   <p className="text-sm font-medium">{user?.fullName}</p>
-                  <p className="text-xs text-muted-foreground">@{user?.username}</p>
+                  <p className="text-xs text-muted-foreground">{user?.username}</p>
                   {user && getRoleBadge(user.role)}
                 </div>
               </DropdownMenuLabel>
