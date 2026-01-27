@@ -5,7 +5,7 @@ import {
   Plus, Search, Clock, CheckCircle, ShoppingCart, FileText,
   ChevronLeft, ChevronRight, Eye, Printer, Check, X, Trash2,
   Package, User, Phone, Mail, MapPin, Calendar, AlertCircle,
-  Minus, RefreshCw
+  Minus, RefreshCw, Settings, Upload, Building2, Hash, Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  Textarea
+  Textarea, Separator
 } from '@/components/ui';
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 
@@ -70,6 +70,41 @@ interface Stats {
   total: number;
 }
 
+interface EmpresaConfig {
+  id?: string;
+  nombre: string;
+  nit: string;
+  direccion: string;
+  ciudad: string;
+  telefono_principal: string;
+  telefono_secundario: string;
+  telefono_adicional: string;
+  email: string;
+  logo: string | null;
+  prefijo_cotizacion: string;
+  siguiente_numero: number;
+  pie_empresa: string;
+  pie_agradecimiento: string;
+  pie_contacto: string;
+}
+
+const defaultConfig: EmpresaConfig = {
+  nombre: 'NICMAT S.R.L.',
+  nit: '',
+  direccion: '',
+  ciudad: 'Bolivia',
+  telefono_principal: '',
+  telefono_secundario: '',
+  telefono_adicional: '',
+  email: '',
+  logo: null,
+  prefijo_cotizacion: 'COT',
+  siguiente_numero: 1,
+  pie_empresa: 'NICMAT S.R.L.',
+  pie_agradecimiento: '¡Gracias por su preferencia!',
+  pie_contacto: ''
+};
+
 export default function CotizacionesPage() {
   // Estados principales
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
@@ -81,6 +116,13 @@ export default function CotizacionesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('_all');
+  
+  // Configuración de empresa
+  const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(defaultConfig);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configForm, setConfigForm] = useState<EmpresaConfig>(defaultConfig);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   
   // Inventario
   const [inventario, setInventario] = useState<InventoryItem[]>([]);
@@ -112,6 +154,20 @@ export default function CotizacionesPage() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   
   const { toast } = useToast();
+
+  // Fetch configuración de empresa
+  const fetchEmpresaConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/empresa-config');
+      const data = await response.json();
+      if (data.config) {
+        setEmpresaConfig(data.config);
+        setConfigForm(data.config);
+      }
+    } catch (error) {
+      console.error('Error fetching config:', error);
+    }
+  }, []);
 
   // Fetch cotizaciones
   const fetchCotizaciones = useCallback(async () => {
@@ -168,7 +224,8 @@ export default function CotizacionesPage() {
     fetchCotizaciones();
     fetchStats();
     fetchInventario();
-  }, [fetchCotizaciones, fetchStats, fetchInventario]);
+    fetchEmpresaConfig();
+  }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig]);
 
   // Realtime subscription
   useEffect(() => {
@@ -280,6 +337,59 @@ export default function CotizacionesPage() {
     setTerminos('');
   };
 
+  // Guardar configuración de empresa
+  const handleSaveConfig = async () => {
+    try {
+      setIsSavingConfig(true);
+      const response = await fetch('/api/empresa-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configForm)
+      });
+      
+      if (!response.ok) throw new Error();
+      
+      const data = await response.json();
+      setEmpresaConfig(data.config);
+      setConfigDialogOpen(false);
+      toast({ title: 'Éxito', description: 'Configuración guardada correctamente', variant: 'success' });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' });
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  // Manejar subida de logo
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validar tamaño (max 500KB)
+    if (file.size > 500 * 1024) {
+      toast({ title: 'Error', description: 'El logo debe ser menor a 500KB', variant: 'destructive' });
+      return;
+    }
+    
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Error', description: 'Solo se permiten imágenes', variant: 'destructive' });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      setConfigForm(prev => ({ ...prev, logo: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remover logo
+  const handleRemoveLogo = () => {
+    setConfigForm(prev => ({ ...prev, logo: null }));
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
   // Crear cotización
   const handleCrearCotizacion = async () => {
     if (productosAgregados.length === 0) {
@@ -382,6 +492,17 @@ export default function CotizacionesPage() {
     const fechaFormat = new Date(cot.fecha).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
     const venceFormat = new Date(cot.fecha_vencimiento).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
     
+    // Usar configuración de empresa
+    const cfg = empresaConfig;
+    
+    // Logo HTML
+    const logoHTML = cfg.logo 
+      ? `<img src="${cfg.logo}" alt="Logo" style="width: 70px; height: 70px; object-fit: contain; border-radius: 8px;">`
+      : `<div class="company-logo-placeholder">${cfg.nombre.substring(0, 2).toUpperCase()}</div>`;
+    
+    // Teléfonos
+    const telefonos = [cfg.telefono_principal, cfg.telefono_secundario, cfg.telefono_adicional].filter(Boolean).join(' | ');
+    
     const productosHTML = cot.productos.map((p, i) => `
       <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
         <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
@@ -435,9 +556,12 @@ export default function CotizacionesPage() {
       border-bottom: 3px solid #1a5f7a;
     }
     .company-info {
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
       flex: 1;
     }
-    .company-logo {
+    .company-logo-placeholder {
       width: 70px;
       height: 70px;
       background: linear-gradient(135deg, #1a5f7a 0%, #2d8eb4 100%);
@@ -448,7 +572,10 @@ export default function CotizacionesPage() {
       color: white;
       font-size: 28px;
       font-weight: bold;
-      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .company-text {
+      flex: 1;
     }
     .company-name {
       font-size: 24pt;
@@ -506,14 +633,21 @@ export default function CotizacionesPage() {
       grid-template-columns: 1fr 1fr;
       gap: 8px 30px;
     }
-    .client-item label {
-      font-size: 8pt;
-      color: #888;
-      text-transform: uppercase;
-    }
-    .client-item p {
+    .client-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-size: 10pt;
-      font-weight: 500;
+    }
+    .client-item label {
+      font-weight: 600;
+      color: #1a5f7a;
+      white-space: nowrap;
+    }
+    .client-item label::after {
+      content: ':';
+    }
+    .client-item span {
       color: #333;
     }
     table {
@@ -659,14 +793,16 @@ export default function CotizacionesPage() {
     <!-- Header -->
     <div class="header">
       <div class="company-info">
-        <div class="company-logo">NM</div>
-        <div class="company-name">NICMAT S.R.L.</div>
-        <div class="company-details">
-          NIT: 123456789<br>
-          Av. Principal #123, Zona Central<br>
-          Santa Cruz - Bolivia<br>
-          Tel: +591 3 123-4567 | Cel: +591 70012345<br>
-          info@nicmatsrl.com
+        ${logoHTML}
+        <div class="company-text">
+          <div class="company-name">${cfg.nombre}</div>
+          <div class="company-details">
+            ${cfg.nit ? `NIT: ${cfg.nit}<br>` : ''}
+            ${cfg.direccion ? `${cfg.direccion}<br>` : ''}
+            ${cfg.ciudad ? `${cfg.ciudad}<br>` : ''}
+            ${telefonos ? `Tel: ${telefonos}<br>` : ''}
+            ${cfg.email || ''}
+          </div>
         </div>
       </div>
       <div class="quote-info">
@@ -687,19 +823,19 @@ export default function CotizacionesPage() {
       <div class="client-grid">
         <div class="client-item">
           <label>Nombre</label>
-          <p>${cot.cliente_nombre || 'No especificado'}</p>
+          <span>${cot.cliente_nombre || 'No especificado'}</span>
         </div>
         <div class="client-item">
           <label>Teléfono</label>
-          <p>${cot.cliente_telefono || '-'}</p>
+          <span>${cot.cliente_telefono || '-'}</span>
         </div>
         <div class="client-item">
           <label>Email</label>
-          <p>${cot.cliente_email || '-'}</p>
+          <span>${cot.cliente_email || '-'}</span>
         </div>
         <div class="client-item">
           <label>Dirección</label>
-          <p>${cot.cliente_direccion || '-'}</p>
+          <span>${cot.cliente_direccion || '-'}</span>
         </div>
       </div>
     </div>
@@ -764,9 +900,9 @@ export default function CotizacionesPage() {
 
     <!-- Footer -->
     <div class="footer page-break">
-      <div class="footer-company">NICMAT S.R.L.</div>
-      <div class="footer-thanks">¡Gracias por su preferencia!</div>
-      <div class="footer-contact">Para consultas: +591 70012345 | info@nicmatsrl.com</div>
+      <div class="footer-company">${cfg.pie_empresa || cfg.nombre}</div>
+      <div class="footer-thanks">${cfg.pie_agradecimiento || '¡Gracias por su preferencia!'}</div>
+      <div class="footer-contact">${cfg.pie_contacto || (telefonos ? `Para consultas: ${telefonos}${cfg.email ? ' | ' + cfg.email : ''}` : '')}</div>
     </div>
   </div>
 </body>
@@ -804,6 +940,10 @@ export default function CotizacionesPage() {
             {isConnected ? <RefreshCw className="h-3 w-3" /> : <RefreshCw className="h-3 w-3" />}
             {isConnected ? 'Conectado' : 'Sin conexión'}
           </div>
+          <Button variant="outline" onClick={() => { setConfigForm(empresaConfig); setConfigDialogOpen(true); }}>
+            <Settings className="mr-2 h-4 w-4" />
+            Configurar
+          </Button>
           <Button onClick={() => setShowForm(!showForm)}>
             {showForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
             {showForm ? 'Cancelar' : 'Nueva Cotización'}
@@ -1400,6 +1540,256 @@ export default function CotizacionesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Configuración de Empresa */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Configuración de Empresa
+            </DialogTitle>
+            <DialogDescription>
+              Configura los datos que aparecerán en las cotizaciones PDF
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-6 py-4">
+            {/* Logo */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Upload className="h-4 w-4" /> Logo de la Empresa
+              </Label>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted">
+                  {configForm.logo ? (
+                    <img src={configForm.logo} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="text-2xl font-bold text-muted-foreground">
+                      {configForm.nombre?.substring(0, 2).toUpperCase() || 'NM'}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    ref={logoInputRef}
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => logoInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-3 w-3" />
+                    Subir Logo
+                  </Button>
+                  {configForm.logo && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-3 w-3" />
+                      Quitar
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">PNG, JPG o SVG. Máx. 500KB</p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Datos de la empresa */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Building2 className="h-4 w-4" /> Datos de la Empresa
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-nombre">Nombre de la Empresa</Label>
+                  <Input
+                    id="cfg-nombre"
+                    value={configForm.nombre}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, nombre: e.target.value }))}
+                    placeholder="NICMAT S.R.L."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-nit">NIT</Label>
+                  <Input
+                    id="cfg-nit"
+                    value={configForm.nit}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, nit: e.target.value }))}
+                    placeholder="123456789"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="cfg-direccion">Dirección</Label>
+                  <Input
+                    id="cfg-direccion"
+                    value={configForm.direccion}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, direccion: e.target.value }))}
+                    placeholder="Av. Principal #123, Zona Central"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-ciudad">Ciudad</Label>
+                  <Input
+                    id="cfg-ciudad"
+                    value={configForm.ciudad}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, ciudad: e.target.value }))}
+                    placeholder="Santa Cruz - Bolivia"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-email">Correo Electrónico</Label>
+                  <Input
+                    id="cfg-email"
+                    type="email"
+                    value={configForm.email}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="info@empresa.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Teléfonos */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Phone className="h-4 w-4" /> Teléfonos
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-tel1">Teléfono Principal</Label>
+                  <Input
+                    id="cfg-tel1"
+                    value={configForm.telefono_principal}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_principal: e.target.value }))}
+                    placeholder="+591 3 123-4567"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-tel2">Teléfono Secundario</Label>
+                  <Input
+                    id="cfg-tel2"
+                    value={configForm.telefono_secundario}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_secundario: e.target.value }))}
+                    placeholder="+591 70012345"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-tel3">Teléfono Adicional</Label>
+                  <Input
+                    id="cfg-tel3"
+                    value={configForm.telefono_adicional}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_adicional: e.target.value }))}
+                    placeholder="+591 70000000"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Numeración */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Hash className="h-4 w-4" /> Numeración de Cotizaciones
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-prefijo">Prefijo</Label>
+                  <Input
+                    id="cfg-prefijo"
+                    value={configForm.prefijo_cotizacion}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, prefijo_cotizacion: e.target.value }))}
+                    placeholder="COT"
+                  />
+                  <p className="text-xs text-muted-foreground">Ej: COT generará COT-2025-0001</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-numero">Siguiente Número</Label>
+                  <Input
+                    id="cfg-numero"
+                    type="number"
+                    min="1"
+                    value={configForm.siguiente_numero}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, siguiente_numero: parseInt(e.target.value) || 1 }))}
+                    placeholder="1"
+                  />
+                  <p className="text-xs text-muted-foreground">El próximo número de cotización</p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Pie de página */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Pie de Página del PDF</Label>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-pie-empresa">Nombre en Pie</Label>
+                  <Input
+                    id="cfg-pie-empresa"
+                    value={configForm.pie_empresa}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_empresa: e.target.value }))}
+                    placeholder="NICMAT S.R.L."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-pie-agradecimiento">Mensaje de Agradecimiento</Label>
+                  <Input
+                    id="cfg-pie-agradecimiento"
+                    value={configForm.pie_agradecimiento}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_agradecimiento: e.target.value }))}
+                    placeholder="¡Gracias por su preferencia!"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-pie-contacto">Información de Contacto</Label>
+                  <Input
+                    id="cfg-pie-contacto"
+                    value={configForm.pie_contacto}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_contacto: e.target.value }))}
+                    placeholder="Para consultas: +591 70012345 | info@empresa.com"
+                  />
+                  <p className="text-xs text-muted-foreground">Dejar vacío para usar teléfonos y email configurados</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={isSavingConfig}>
+              {isSavingConfig ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar Configuración
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
