@@ -173,37 +173,90 @@ export default function InventarioPage() {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Suscripción a Realtime de Supabase
+  // Suscripción a Realtime de Supabase - mejorada para móviles
   useEffect(() => {
-    // Crear canal de suscripción
-    const channel = supabase
-      .channel('inventory-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'inventory',
-        },
-        (payload) => {
-          console.log('🔄 Cambio en tiempo real:', payload.eventType);
-          // Recargar datos cuando hay cualquier cambio
-          fetchInventory();
-          fetchMarcas();
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Estado Realtime:', status);
-        setIsRealtime(status === 'SUBSCRIBED');
-      });
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
 
-    channelRef.current = channel;
-
-    // Cleanup al desmontar
-    return () => {
+    const setupChannel = () => {
+      // Limpiar canal anterior
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
+
+      // Crear canal de suscripción
+      const channel = supabase
+        .channel(`inventory-changes-${Date.now()}`, {
+          config: {
+            broadcast: { self: true },
+          },
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'inventory',
+          },
+          (payload) => {
+            console.log('🔄 Cambio en tiempo real:', payload.eventType);
+            // Recargar datos cuando hay cualquier cambio
+            fetchInventory();
+            fetchMarcas();
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Estado Realtime:', status);
+          if (status === 'SUBSCRIBED') {
+            setIsRealtime(true);
+            reconnectAttempts = 0;
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setIsRealtime(false);
+            // Intentar reconectar
+            if (reconnectAttempts < maxReconnectAttempts) {
+              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+              reconnectTimeout = setTimeout(() => {
+                reconnectAttempts++;
+                setupChannel();
+              }, delay);
+            }
+          }
+        });
+
+      channelRef.current = channel;
+    };
+
+    setupChannel();
+
+    // Manejar visibilidad (importante para Android)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        reconnectAttempts = 0;
+        setupChannel();
+        fetchInventory(); // Refrescar datos al volver
+      }
+    };
+
+    const handleOnline = () => {
+      reconnectAttempts = 0;
+      setupChannel();
+      fetchInventory();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    // Cleanup al desmontar
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleVisibilityChange);
     };
   }, [fetchInventory, fetchMarcas]);
 

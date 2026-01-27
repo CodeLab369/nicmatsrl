@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtime } from '@/hooks/use-realtime';
 import { User } from '@/types';
 import { USER_ROLES, ROUTES, SUCCESS_MESSAGES, ERROR_MESSAGES } from '@/lib/constants';
 import { formatDateTime } from '@/lib/utils';
@@ -75,6 +76,14 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Realtime para usuarios
+  const { isConnected } = useRealtime({
+    table: 'users',
+    onChange: () => {
+      fetchUsers();
+    },
+  });
 
   // Filtrar usuarios con useMemo
   const filteredUsers = useMemo(() => {
@@ -179,10 +188,16 @@ export default function UsersPage() {
             Gestiona los usuarios del sistema
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Usuario
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-600' : 'text-gray-400'}`}>
+            <RefreshCw className={`h-3 w-3 ${isConnected ? '' : 'animate-spin'}`} />
+            {isConnected ? 'Tiempo real' : 'Conectando...'}
+          </div>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
 
       {/* Búsqueda */}

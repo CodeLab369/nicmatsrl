@@ -12,3 +12,4 @@ export { Avatar, AvatarFallback, AvatarImage } from './avatar';
 export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './dropdown-menu';
 export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './alert-dialog';
 export { Badge } from './badge';
+export { LoadingSpinner, PageLoader, TableSkeleton, CardSkeleton } from './loading';

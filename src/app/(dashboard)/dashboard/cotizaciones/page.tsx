@@ -229,23 +229,78 @@ export default function CotizacionesPage() {
     fetchEmpresaConfig();
   }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig]);
 
-  // Realtime subscription
+  // Realtime subscription - mejorada para móviles
   useEffect(() => {
-    const channel = supabase
-      .channel('cotizaciones-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+
+    const setupChannel = () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+
+      const channel = supabase
+        .channel(`cotizaciones-changes-${Date.now()}`, {
+          config: { broadcast: { self: true } },
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+          fetchCotizaciones();
+          fetchStats();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, () => {
+          fetchEmpresaConfig();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setIsConnected(true);
+            reconnectAttempts = 0;
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setIsConnected(false);
+            if (reconnectAttempts < maxReconnectAttempts) {
+              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+              reconnectTimeout = setTimeout(() => {
+                reconnectAttempts++;
+                setupChannel();
+              }, delay);
+            }
+          }
+        });
+
+      channelRef.current = channel;
+    };
+
+    setupChannel();
+
+    // Handlers para móviles
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        reconnectAttempts = 0;
+        setupChannel();
         fetchCotizaciones();
         fetchStats();
-      })
-      .subscribe((status) => {
-        setIsConnected(status === 'SUBSCRIBED');
-      });
-
-    channelRef.current = channel;
-    return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      }
     };
-  }, [fetchCotizaciones, fetchStats]);
+
+    const handleOnline = () => {
+      reconnectAttempts = 0;
+      setupChannel();
+      fetchCotizaciones();
+      fetchStats();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [fetchCotizaciones, fetchStats, fetchEmpresaConfig]);
 
   // Actualizar amperajes cuando cambia la marca
   useEffect(() => {

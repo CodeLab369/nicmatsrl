@@ -21,7 +21,11 @@ CREATE POLICY "Allow all operations for empresa_config" ON public.empresa_config
   WITH CHECK (true);
 
 -- 3. Arreglar la función generate_cotizacion_numero con search_path
-DROP FUNCTION IF EXISTS public.generate_cotizacion_numero();
+-- Primero eliminar el trigger que depende de la función
+DROP TRIGGER IF EXISTS trigger_cotizacion_numero ON public.cotizaciones;
+
+-- Ahora eliminar la función
+DROP FUNCTION IF EXISTS public.generate_cotizacion_numero() CASCADE;
 
 CREATE OR REPLACE FUNCTION public.generate_cotizacion_numero()
 RETURNS TEXT
@@ -58,6 +62,26 @@ BEGIN
   RETURN resultado;
 END;
 $$;
+
+-- Recrear el trigger para generar número automáticamente
+CREATE OR REPLACE FUNCTION public.set_cotizacion_numero()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.numero IS NULL OR NEW.numero = '' THEN
+    NEW.numero := generate_cotizacion_numero();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_cotizacion_numero
+  BEFORE INSERT ON public.cotizaciones
+  FOR EACH ROW
+  EXECUTE FUNCTION set_cotizacion_numero();
 
 -- Verificar que las tablas tienen RLS habilitado
 SELECT tablename, rowsecurity 
