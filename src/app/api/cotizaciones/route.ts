@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '5');
     const search = searchParams.get('search') || '';
     const estado = searchParams.get('estado') || '';
+    const cliente = searchParams.get('cliente') || '';
     const getStats = searchParams.get('getStats') === 'true';
+    const getClientes = searchParams.get('getClientes') === 'true';
     const id = searchParams.get('id') || '';
 
     // Obtener una cotización específica
@@ -27,6 +29,18 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
       return NextResponse.json({ cotizacion: data });
+    }
+
+    // Obtener lista de clientes únicos
+    if (getClientes) {
+      const { data: all } = await supabase
+        .from('cotizaciones')
+        .select('cliente_nombre')
+        .not('cliente_nombre', 'is', null)
+        .not('cliente_nombre', 'eq', '');
+      
+      const clientes = Array.from(new Set(all?.map(c => c.cliente_nombre).filter(Boolean) || [])).sort();
+      return NextResponse.json({ clientes });
     }
 
     // Obtener estadísticas
@@ -57,6 +71,9 @@ export async function GET(request: NextRequest) {
     }
     if (estado && estado !== '_all') {
       query = query.eq('estado', estado);
+    }
+    if (cliente && cliente !== '_all') {
+      query = query.eq('cliente_nombre', cliente);
     }
 
     const { data, error, count } = await query

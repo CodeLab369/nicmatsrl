@@ -5,7 +5,7 @@ import {
   Plus, Search, Clock, CheckCircle, ShoppingCart, FileText,
   ChevronLeft, ChevronRight, Eye, Printer, Check, X, Trash2,
   Package, User, Phone, Mail, MapPin, Calendar, AlertCircle,
-  Minus, RefreshCw, Settings, Upload, Building2, Hash, Save
+  Minus, RefreshCw, Settings, Upload, Building2, Hash, Save, Pencil
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -112,6 +112,8 @@ export default function CotizacionesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('_all');
+  const [filterCliente, setFilterCliente] = useState('_all');
+  const [clientesOptions, setClientesOptions] = useState<string[]>([]);
   
   // Configuración de empresa
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(defaultConfig);
@@ -144,6 +146,7 @@ export default function CotizacionesPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCotizacion, setSelectedCotizacion] = useState<Cotizacion | null>(null);
+  const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null);
   
   const { toast } = useToast();
 
@@ -169,7 +172,8 @@ export default function CotizacionesPage() {
         page: page.toString(),
         limit: limit.toString(),
         search,
-        estado: filterEstado
+        estado: filterEstado,
+        cliente: filterCliente
       });
       
       const response = await fetch(`/api/cotizaciones?${params}`);
@@ -183,7 +187,7 @@ export default function CotizacionesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, filterEstado]);
+  }, [page, limit, search, filterEstado, filterCliente]);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -211,13 +215,25 @@ export default function CotizacionesPage() {
     }
   }, []);
 
+  // Fetch clientes únicos
+  const fetchClientes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/cotizaciones?getClientes=true');
+      const data = await response.json();
+      if (data.clientes) setClientesOptions(data.clientes);
+    } catch (error) {
+      console.error('Error fetching clientes:', error);
+    }
+  }, []);
+
   // Initial fetch
   useEffect(() => {
     fetchCotizaciones();
     fetchStats();
     fetchInventario();
     fetchEmpresaConfig();
-  }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig]);
+    fetchClientes();
+  }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig, fetchClientes]);
 
   // Suscripción a Realtime centralizada - cotizaciones
   const isConnectedCot = useTableSubscription('cotizaciones', () => {
@@ -261,7 +277,7 @@ export default function CotizacionesPage() {
   // Resetear página al cambiar filtros
   useEffect(() => {
     setPage(1);
-  }, [search, filterEstado, limit]);
+  }, [search, filterEstado, filterCliente, limit]);
 
   // Agregar producto a la lista
   const handleAgregarProducto = () => {
@@ -378,7 +394,7 @@ export default function CotizacionesPage() {
     if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
-  // Crear cotización
+  // Crear o actualizar cotización
   const handleCrearCotizacion = async () => {
     if (productosAgregados.length === 0) {
       toast({ title: 'Error', description: 'Agrega al menos un producto', variant: 'destructive' });
@@ -387,30 +403,67 @@ export default function CotizacionesPage() {
     
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/cotizaciones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cliente_nombre: clienteData.nombre,
-          cliente_telefono: clienteData.telefono,
-          cliente_email: clienteData.email,
-          cliente_direccion: clienteData.direccion,
-          productos: productosAgregados,
-          descuento: descuentoNum,
-          vigencia_dias: parseInt(vigenciaDias),
-          terminos
-        })
-      });
       
-      if (!response.ok) throw new Error();
+      if (editingCotizacion) {
+        // Actualizar cotización existente
+        const subtotal = productosAgregados.reduce((sum, p) => sum + p.total, 0);
+        const total = subtotal - descuentoNum;
+        const fecha_vencimiento = new Date();
+        fecha_vencimiento.setDate(fecha_vencimiento.getDate() + parseInt(vigenciaDias));
+        
+        const response = await fetch('/api/cotizaciones', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingCotizacion.id,
+            cliente_nombre: clienteData.nombre,
+            cliente_telefono: clienteData.telefono,
+            cliente_email: clienteData.email,
+            cliente_direccion: clienteData.direccion,
+            productos: productosAgregados,
+            total_unidades: productosAgregados.reduce((sum, p) => sum + p.cantidad, 0),
+            subtotal,
+            descuento: descuentoNum,
+            total,
+            vigencia_dias: parseInt(vigenciaDias),
+            fecha_vencimiento: fecha_vencimiento.toISOString().split('T')[0],
+            terminos
+          })
+        });
+        
+        if (!response.ok) throw new Error();
+        
+        toast({ title: 'Éxito', description: 'Cotización actualizada correctamente', variant: 'success' });
+      } else {
+        // Crear nueva cotización
+        const response = await fetch('/api/cotizaciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cliente_nombre: clienteData.nombre,
+            cliente_telefono: clienteData.telefono,
+            cliente_email: clienteData.email,
+            cliente_direccion: clienteData.direccion,
+            productos: productosAgregados,
+            descuento: descuentoNum,
+            vigencia_dias: parseInt(vigenciaDias),
+            terminos
+          })
+        });
+        
+        if (!response.ok) throw new Error();
+        
+        toast({ title: 'Éxito', description: 'Cotización creada correctamente', variant: 'success' });
+      }
       
-      toast({ title: 'Éxito', description: 'Cotización creada correctamente', variant: 'success' });
       handleLimpiar();
       setShowForm(false);
+      setEditingCotizacion(null);
       fetchCotizaciones();
       fetchStats();
+      fetchClientes();
     } catch {
-      toast({ title: 'Error', description: 'No se pudo crear la cotización', variant: 'destructive' });
+      toast({ title: 'Error', description: editingCotizacion ? 'No se pudo actualizar la cotización' : 'No se pudo crear la cotización', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -436,8 +489,79 @@ export default function CotizacionesPage() {
       toast({ title: 'Éxito', description: mensajes[nuevoEstado] || 'Estado actualizado', variant: 'success' });
       fetchCotizaciones();
       fetchStats();
+      fetchClientes();
     } catch {
       toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+    }
+  };
+
+  // Editar cotización - cargar datos en el formulario
+  const handleEditarCotizacion = (cot: Cotizacion) => {
+    setEditingCotizacion(cot);
+    setClienteData({
+      nombre: cot.cliente_nombre || '',
+      telefono: cot.cliente_telefono || '',
+      email: cot.cliente_email || '',
+      direccion: cot.cliente_direccion || ''
+    });
+    setProductosAgregados(cot.productos || []);
+    setDescuento(cot.descuento?.toString() || '0');
+    setVigenciaDias(cot.vigencia_dias?.toString() || '7');
+    setTerminos(cot.terminos || '');
+    setShowForm(true);
+  };
+
+  // Convertir a venta - resta inventario
+  const handleConvertirAVenta = async (cot: Cotizacion) => {
+    try {
+      // Primero restamos del inventario
+      for (const producto of cot.productos) {
+        const inventoryItem = inventario.find(
+          i => i.marca === producto.marca && i.amperaje === producto.amperaje
+        );
+        
+        if (inventoryItem) {
+          const nuevaCantidad = Math.max(0, inventoryItem.cantidad - producto.cantidad);
+          
+          const response = await fetch('/api/inventory', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: inventoryItem.id,
+              cantidad: nuevaCantidad
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Error al actualizar inventario de ${producto.marca} ${producto.amperaje}`);
+          }
+        }
+      }
+      
+      // Luego cambiamos el estado a convertida
+      const response = await fetch('/api/cotizaciones', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cot.id, estado: 'convertida' })
+      });
+      
+      if (!response.ok) throw new Error();
+      
+      toast({ 
+        title: 'Venta registrada', 
+        description: `Se restó ${cot.total_unidades} unidades del inventario`, 
+        variant: 'success' 
+      });
+      
+      fetchCotizaciones();
+      fetchStats();
+      fetchInventario();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'No se pudo convertir a venta', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -951,7 +1075,7 @@ export default function CotizacionesPage() {
             <Settings className="mr-2 h-4 w-4" />
             Configurar
           </Button>
-          <Button onClick={() => setShowForm(!showForm)}>
+          <Button onClick={() => { setShowForm(!showForm); if (showForm) { setEditingCotizacion(null); handleLimpiar(); } }}>
             {showForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
             {showForm ? 'Cancelar' : 'Nueva Cotización'}
           </Button>
@@ -1006,15 +1130,15 @@ export default function CotizacionesPage() {
         </Card>
       </div>
 
-      {/* Formulario Nueva Cotización */}
+      {/* Formulario Nueva/Editar Cotización */}
       {showForm && (
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Formulario principal */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="shadow-soft">
               <CardHeader>
-                <CardTitle>Nueva Cotización</CardTitle>
-                <p className="text-sm text-muted-foreground">Selecciona productos del inventario</p>
+                <CardTitle>{editingCotizacion ? `Editar Cotización ${editingCotizacion.numero}` : 'Nueva Cotización'}</CardTitle>
+                <p className="text-sm text-muted-foreground">{editingCotizacion ? 'Modifica los datos de la cotización' : 'Selecciona productos del inventario'}</p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Datos del cliente */}
@@ -1259,7 +1383,7 @@ export default function CotizacionesPage() {
                     onClick={handleCrearCotizacion}
                     disabled={isSubmitting || productosAgregados.length === 0}
                   >
-                    {isSubmitting ? 'Creando...' : 'Crear Cotización'}
+                    {isSubmitting ? (editingCotizacion ? 'Guardando...' : 'Creando...') : (editingCotizacion ? 'Guardar Cambios' : 'Crear Cotización')}
                   </Button>
                 </div>
               </CardContent>
@@ -1276,7 +1400,18 @@ export default function CotizacionesPage() {
               <CardTitle className="text-lg">Cotizaciones</CardTitle>
               <p className="text-sm text-muted-foreground">Historial de cotizaciones</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={filterCliente} onValueChange={setFilterCliente}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Todos los clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos los clientes</SelectItem>
+                  {clientesOptions.map(cliente => (
+                    <SelectItem key={cliente} value={cliente}>{cliente}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filterEstado} onValueChange={setFilterEstado}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Todos los estados" />
@@ -1292,13 +1427,15 @@ export default function CotizacionesPage() {
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 Mostrar:
                 <Select value={limit.toString()} onValueChange={(v) => setLimit(parseInt(v))}>
-                  <SelectTrigger className="w-16 h-8">
+                  <SelectTrigger className="w-20 h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="5">5</SelectItem>
                     <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1351,6 +1488,7 @@ export default function CotizacionesPage() {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => { setSelectedCotizacion(cot); setViewDialogOpen(true); }}
+                              title="Ver detalle"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -1359,6 +1497,7 @@ export default function CotizacionesPage() {
                               size="icon" 
                               className="h-8 w-8"
                               onClick={() => handlePrint(cot)}
+                              title="Imprimir"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1367,8 +1506,18 @@ export default function CotizacionesPage() {
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
+                                  className="h-8 w-8 text-amber-600 hover:text-amber-700"
+                                  onClick={() => handleEditarCotizacion(cot)}
+                                  title="Editar cotización"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
                                   className="h-8 w-8 text-green-500 hover:text-green-600"
                                   onClick={() => handleCambiarEstado(cot.id, 'aceptada')}
+                                  title="Aceptar"
                                 >
                                   <Check className="h-4 w-4" />
                                 </Button>
@@ -1377,6 +1526,7 @@ export default function CotizacionesPage() {
                                   size="icon" 
                                   className="h-8 w-8 text-red-500 hover:text-red-600"
                                   onClick={() => handleCambiarEstado(cot.id, 'rechazada')}
+                                  title="Rechazar"
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -1385,6 +1535,7 @@ export default function CotizacionesPage() {
                                   size="icon" 
                                   className="h-8 w-8 text-destructive"
                                   onClick={() => { setSelectedCotizacion(cot); setDeleteDialogOpen(true); }}
+                                  title="Eliminar"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1395,8 +1546,8 @@ export default function CotizacionesPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-8 w-8 text-blue-600"
-                                onClick={() => handleCambiarEstado(cot.id, 'convertida')}
-                                title="Convertir a Venta"
+                                onClick={() => handleConvertirAVenta(cot)}
+                                title="Convertir a Venta (resta inventario)"
                               >
                                 <ShoppingCart className="h-4 w-4" />
                               </Button>
