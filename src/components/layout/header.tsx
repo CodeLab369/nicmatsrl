@@ -48,11 +48,10 @@ export function Header() {
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="flex items-center justify-between h-16 px-4 md:px-6">
-          {/* Menú móvil */}
+          {/* Menú hamburguesa - siempre visible */}
           <Button
             variant="ghost"
             size="icon"
-            className="xl:hidden"
             onClick={() => setMobileMenuOpen(true)}
           >
             <Menu className="h-5 w-5" />
@@ -126,12 +125,12 @@ export function Header() {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 z-50 bg-black/50 xl:hidden"
+            className="fixed inset-0 z-50 bg-black/50"
             onClick={() => setMobileMenuOpen(false)}
           />
           {/* Sidebar */}
           <Sidebar
-            className="xl:hidden animate-slide-in"
+            className="animate-slide-in"
             onNavigate={() => setMobileMenuOpen(false)}
           />
         </>
