@@ -25,10 +25,8 @@ const subscribers: Record<TableName, Set<Callback>> = {
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const mountedRef = useRef(true);
 
   useEffect(() => {
-    mountedRef.current = true;
     const supabase = createBrowserClient();
     
     console.log('[Realtime] Iniciando conexión...');
@@ -37,53 +35,31 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel('app-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload) => {
-        console.log('[Realtime] Cambio en inventory:', payload);
+        console.log('[Realtime] Cambio en inventory:', payload.eventType);
         subscribers.inventory.forEach(cb => cb());
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
-        console.log('[Realtime] Cambio en cotizaciones:', payload);
+        console.log('[Realtime] Cambio en cotizaciones:', payload.eventType);
         subscribers.cotizaciones.forEach(cb => cb());
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, (payload) => {
-        console.log('[Realtime] Cambio en empresa_config:', payload);
+        console.log('[Realtime] Cambio en empresa_config:', payload.eventType);
         subscribers.empresa_config.forEach(cb => cb());
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-        console.log('[Realtime] Cambio en users:', payload);
+        console.log('[Realtime] Cambio en users:', payload.eventType);
         subscribers.users.forEach(cb => cb());
       })
       .subscribe((status, err) => {
-        if (!mountedRef.current) return;
         console.log('[Realtime] Status:', status, err ? `Error: ${err.message}` : '');
         setIsConnected(status === 'SUBSCRIBED');
       });
 
     channelRef.current = channel;
 
-    // Manejar reconexión
-    const handleReconnect = () => {
-      if (channelRef.current) {
-        console.log('[Realtime] Reconnecting...');
-        channelRef.current.subscribe();
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        handleReconnect();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('online', handleReconnect);
-    window.addEventListener('focus', handleReconnect);
-
+    // Cleanup al desmontar
     return () => {
-      mountedRef.current = false;
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('online', handleReconnect);
-      window.removeEventListener('focus', handleReconnect);
-      
+      console.log('[Realtime] Cerrando conexión...');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -94,8 +70,6 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   // Función para suscribirse a una tabla
   const subscribe = useCallback((table: TableName, callback: Callback): (() => void) => {
     subscribers[table].add(callback);
-    
-    // Retornar función de limpieza
     return () => {
       subscribers[table].delete(callback);
     };
