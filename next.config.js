@@ -6,9 +6,6 @@ const nextConfig = {
   // Comprimir respuestas
   compress: true,
   
-  // Optimización de builds
-  swcMinify: true,
-  
   // Configuración de imágenes optimizadas
   images: {
     remotePatterns: [
@@ -19,11 +16,6 @@ const nextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 días
-  },
-  
-  // Experimental features para mejor rendimiento
-  experimental: {
-    optimizeCss: true,
   },
   
   // Headers de seguridad y caché
