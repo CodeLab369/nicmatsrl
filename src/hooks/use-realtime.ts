@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -16,6 +16,9 @@ interface UseRealtimeOptions {
   onChange?: RealtimeCallback;
 }
 
+// Obtener cliente singleton
+const getSupabase = () => createBrowserClient();
+
 export function useRealtime({
   table,
   event = '*',
@@ -25,23 +28,29 @@ export function useRealtime({
   onDelete,
   onChange,
 }: UseRealtimeOptions) {
-  const supabase = useMemo(() => createBrowserClient(), []);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 10;
+  const mountedRef = useRef(true);
+  
+  // Refs para callbacks para evitar recrear el canal
+  const callbacksRef = useRef({ onInsert, onUpdate, onDelete, onChange });
+  callbacksRef.current = { onInsert, onUpdate, onDelete, onChange };
 
-  const setupChannel = useCallback(() => {
-    // Limpiar canal anterior si existe
+  useEffect(() => {
+    mountedRef.current = true;
+    const supabase = getSupabase();
+    
+    // Nombre de canal fijo basado en la tabla
+    const channelName = `db-${table}`;
+    
+    // Remover canal existente si hay uno
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
-
-    // Configurar el canal de Realtime
-    const channelName = `realtime-${table}-${Date.now()}`;
     
-    let channelConfig: any = {
+    // Configurar suscripción
+    const channelConfig: any = {
       event,
       schema: 'public',
       table,
@@ -52,88 +61,75 @@ export function useRealtime({
     }
 
     const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: true },
-          presence: { key: '' },
-        },
-      })
+      .channel(channelName)
       .on('postgres_changes', channelConfig, (payload) => {
-        // Llamar al callback general si existe
-        if (onChange) {
-          onChange(payload);
+        const callbacks = callbacksRef.current;
+        
+        // Callback general
+        if (callbacks.onChange) {
+          callbacks.onChange(payload);
         }
 
-        // Llamar a callbacks específicos según el evento
+        // Callbacks específicos
         switch (payload.eventType) {
           case 'INSERT':
-            if (onInsert) onInsert(payload);
+            if (callbacks.onInsert) callbacks.onInsert(payload);
             break;
           case 'UPDATE':
-            if (onUpdate) onUpdate(payload);
+            if (callbacks.onUpdate) callbacks.onUpdate(payload);
             break;
           case 'DELETE':
-            if (onDelete) onDelete(payload);
+            if (callbacks.onDelete) callbacks.onDelete(payload);
             break;
         }
       })
       .subscribe((status) => {
+        if (!mountedRef.current) return;
+        
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
-          reconnectAttemptsRef.current = 0;
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setIsConnected(false);
-          // Intentar reconectar
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectAttemptsRef.current++;
-              setupChannel();
-            }, delay);
-          }
         }
       });
 
     channelRef.current = channel;
-  }, [supabase, table, event, filter, onInsert, onUpdate, onDelete, onChange]);
-
-  useEffect(() => {
-    setupChannel();
-
-    // Manejar visibilidad de la página (importante para móviles)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Reconectar cuando la app vuelve al frente
-        if (!isConnected) {
-          reconnectAttemptsRef.current = 0;
-          setupChannel();
-        }
-      }
-    };
-
-    // Manejar reconexión cuando vuelve la conexión
-    const handleOnline = () => {
-      reconnectAttemptsRef.current = 0;
-      setupChannel();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('focus', handleVisibilityChange);
 
     // Cleanup
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      mountedRef.current = false;
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [setupChannel, isConnected, supabase]);
+  }, [table, event, filter]); // Solo recrear si cambian estos valores
+
+  // Reconectar al volver a la página o recuperar conexión
+  useEffect(() => {
+    const handleReconnect = () => {
+      if (!isConnected && channelRef.current) {
+        // Intentar re-suscribir
+        channelRef.current.subscribe();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleReconnect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleReconnect);
+    window.addEventListener('focus', handleReconnect);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleReconnect);
+      window.removeEventListener('focus', handleReconnect);
+    };
+  }, [isConnected]);
 
   return { channel: channelRef.current, isConnected };
 }

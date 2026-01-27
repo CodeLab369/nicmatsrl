@@ -18,13 +18,11 @@ import {
 } from '@/components/ui';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import { createBrowserClient } from '@/lib/supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
-// Cliente Supabase para Realtime
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Cliente Supabase singleton para Realtime
+const getSupabase = () => createBrowserClient();
 
 interface InventoryItem {
   id: string;
@@ -184,6 +182,7 @@ export default function InventarioPage() {
 
   // Suscripción a Realtime de Supabase - estable
   useEffect(() => {
+    const supabase = getSupabase();
     let reconnectTimeout: NodeJS.Timeout | null = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
@@ -195,9 +194,9 @@ export default function InventarioPage() {
         supabase.removeChannel(channelRef.current);
       }
 
-      // Crear canal de suscripción
+      // Crear canal de suscripción con nombre fijo
       const channel = supabase
-        .channel('inventory-realtime')
+        .channel('db-inventory')
         .on(
           'postgres_changes',
           {
