@@ -524,11 +524,12 @@ export default function CotizacionesPage() {
           const nuevaCantidad = Math.max(0, inventoryItem.cantidad - producto.cantidad);
           
           const response = await fetch('/api/inventory', {
-            method: 'PUT',
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               id: inventoryItem.id,
-              cantidad: nuevaCantidad
+              cantidad: nuevaCantidad,
+              onlyQuantity: true
             })
           });
           

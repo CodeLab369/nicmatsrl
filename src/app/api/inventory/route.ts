@@ -317,12 +317,27 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, marca, amperaje, cantidad, costo, precioVenta } = body;
+    const { id, marca, amperaje, cantidad, costo, precioVenta, onlyQuantity } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
     }
 
+    // Si solo se actualiza cantidad (para ventas)
+    if (onlyQuantity) {
+      const { error } = await supabase
+        .from('inventory')
+        .update({
+          cantidad: parseInt(cantidad) || 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      return NextResponse.json({ success: true });
+    }
+
+    // Actualización completa
     const { error } = await supabase
       .from('inventory')
       .update({
