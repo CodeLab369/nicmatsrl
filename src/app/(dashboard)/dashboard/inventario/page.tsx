@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, X, Wifi, WifiOff, RefreshCw, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
@@ -18,11 +19,6 @@ import {
 } from '@/components/ui';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { createBrowserClient } from '@/lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
-
-// Cliente Supabase singleton para Realtime
-const getSupabase = () => createBrowserClient();
 
 interface InventoryItem {
   id: string;
@@ -50,8 +46,6 @@ export default function InventarioPage() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [isRealtime, setIsRealtime] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
   
   // Filtros
   const [search, setSearch] = useState('');
@@ -171,100 +165,11 @@ export default function InventarioPage() {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Refs para callbacks (evita recrear el canal)
-  const fetchInventoryRef = useRef(fetchInventory);
-  const fetchMarcasRef = useRef(fetchMarcas);
-  
-  useEffect(() => {
-    fetchInventoryRef.current = fetchInventory;
-    fetchMarcasRef.current = fetchMarcas;
-  }, [fetchInventory, fetchMarcas]);
-
-  // Suscripción a Realtime de Supabase - estable
-  useEffect(() => {
-    const supabase = getSupabase();
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-    let isSubscribed = false;
-
-    const setupChannel = () => {
-      // Limpiar canal anterior
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-
-      // Crear canal de suscripción con nombre fijo
-      const channel = supabase
-        .channel('db-inventory')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'inventory',
-          },
-          () => {
-            // Usar refs para evitar recrear el canal
-            fetchInventoryRef.current();
-            fetchMarcasRef.current();
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            setIsRealtime(true);
-            isSubscribed = true;
-            reconnectAttempts = 0;
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            setIsRealtime(false);
-            isSubscribed = false;
-            if (reconnectAttempts < maxReconnectAttempts) {
-              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-              reconnectTimeout = setTimeout(() => {
-                reconnectAttempts++;
-                setupChannel();
-              }, delay);
-            }
-          }
-        });
-
-      channelRef.current = channel;
-    };
-
-    setupChannel();
-
-    // Handlers para móviles - solo reconectar si no está conectado
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !isSubscribed) {
-        reconnectAttempts = 0;
-        setupChannel();
-      }
-      if (document.visibilityState === 'visible') {
-        fetchInventoryRef.current();
-      }
-    };
-
-    const handleOnline = () => {
-      if (!isSubscribed) {
-        reconnectAttempts = 0;
-        setupChannel();
-      }
-      fetchInventoryRef.current();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-
-    // Cleanup
-    return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []); // Sin dependencias - solo se ejecuta una vez
+  // Suscripción a Realtime centralizada
+  const isRealtime = useTableSubscription('inventory', () => {
+    fetchInventory();
+    fetchMarcas();
+  });
 
   // Resetear página al cambiar filtros
   useEffect(() => {

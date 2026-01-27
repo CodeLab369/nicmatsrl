@@ -8,6 +8,7 @@ import {
   Minus, RefreshCw, Settings, Upload, Building2, Hash, Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
@@ -18,11 +19,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   Textarea, Separator
 } from '@/components/ui';
-import { createBrowserClient } from '@/lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
-
-// Cliente Supabase singleton para Realtime
-const getSupabase = () => createBrowserClient();
 
 interface Producto {
   marca: string;
@@ -149,10 +145,6 @@ export default function CotizacionesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedCotizacion, setSelectedCotizacion] = useState<Cotizacion | null>(null);
   
-  // Realtime
-  const [isConnected, setIsConnected] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  
   const { toast } = useToast();
 
   // Fetch configuración de empresa
@@ -227,93 +219,19 @@ export default function CotizacionesPage() {
     fetchEmpresaConfig();
   }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig]);
 
-  // Refs para callbacks (evita recrear el canal)
-  const fetchCotizacionesRef = useRef(fetchCotizaciones);
-  const fetchStatsRef = useRef(fetchStats);
-  const fetchEmpresaConfigRef = useRef(fetchEmpresaConfig);
+  // Suscripción a Realtime centralizada - cotizaciones
+  const isConnectedCot = useTableSubscription('cotizaciones', () => {
+    fetchCotizaciones();
+    fetchStats();
+  });
   
-  useEffect(() => {
-    fetchCotizacionesRef.current = fetchCotizaciones;
-    fetchStatsRef.current = fetchStats;
-    fetchEmpresaConfigRef.current = fetchEmpresaConfig;
-  }, [fetchCotizaciones, fetchStats, fetchEmpresaConfig]);
-
-  // Realtime subscription - estable
-  useEffect(() => {
-    const supabase = getSupabase();
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-    let isSubscribed = false;
-
-    const setupChannel = () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-
-      const channel = supabase
-        .channel('db-cotizaciones')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
-          fetchCotizacionesRef.current();
-          fetchStatsRef.current();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, () => {
-          fetchEmpresaConfigRef.current();
-        })
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            setIsConnected(true);
-            isSubscribed = true;
-            reconnectAttempts = 0;
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            setIsConnected(false);
-            isSubscribed = false;
-            if (reconnectAttempts < maxReconnectAttempts) {
-              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-              reconnectTimeout = setTimeout(() => {
-                reconnectAttempts++;
-                setupChannel();
-              }, delay);
-            }
-          }
-        });
-
-      channelRef.current = channel;
-    };
-
-    setupChannel();
-
-    // Handlers para móviles - solo reconectar si no está conectado
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !isSubscribed) {
-        reconnectAttempts = 0;
-        setupChannel();
-      }
-      if (document.visibilityState === 'visible') {
-        fetchCotizacionesRef.current();
-        fetchStatsRef.current();
-      }
-    };
-
-    const handleOnline = () => {
-      if (!isSubscribed) {
-        reconnectAttempts = 0;
-        setupChannel();
-      }
-      fetchCotizacionesRef.current();
-      fetchStatsRef.current();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []); // Sin dependencias - solo se ejecuta una vez
+  // Suscripción a Realtime centralizada - empresa_config
+  useTableSubscription('empresa_config', () => {
+    fetchEmpresaConfig();
+  });
+  
+  // Usar el estado de conexión de cotizaciones
+  const isConnected = isConnectedCot;
 
   // Actualizar amperajes cuando cambia la marca
   useEffect(() => {

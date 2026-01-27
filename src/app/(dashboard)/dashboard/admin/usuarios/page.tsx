@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw } from 'lucide-react';
-import { useAuth } from '@/contexts';
+import { useAuth, useTableSubscription } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
-import { useRealtime } from '@/hooks/use-realtime';
 import { User } from '@/types';
 import { USER_ROLES, ROUTES, SUCCESS_MESSAGES, ERROR_MESSAGES } from '@/lib/constants';
 import { formatDateTime } from '@/lib/utils';
@@ -77,13 +76,8 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Realtime para usuarios
-  const { isConnected } = useRealtime({
-    table: 'users',
-    onChange: () => {
-      fetchUsers();
-    },
-  });
+  // Realtime centralizado para usuarios
+  const isConnected = useTableSubscription('users', fetchUsers);
 
   // Filtrar usuarios con useMemo
   const filteredUsers = useMemo(() => {

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui';
-import { AuthProvider, ThemeProvider } from '@/contexts';
+import { AuthProvider, ThemeProvider, RealtimeProvider } from '@/contexts';
 import { COMPANY } from '@/lib/constants';
 
 const inter = Inter({
@@ -46,7 +46,9 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
           <AuthProvider>
-            {children}
+            <RealtimeProvider>
+              {children}
+            </RealtimeProvider>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
