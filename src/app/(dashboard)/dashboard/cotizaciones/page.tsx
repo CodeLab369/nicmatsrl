@@ -524,11 +524,19 @@ export default function CotizacionesPage() {
     @page {
       size: letter;
       margin: 15mm;
+      /* Quitar headers y footers del navegador */
+      margin-top: 15mm;
+      margin-bottom: 15mm;
     }
     @media print {
       html, body {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
+      /* Ocultar URL, fecha/hora y título del navegador */
+      @page {
+        margin-top: 0;
+        margin-bottom: 0;
       }
     }
     * {
@@ -542,6 +550,8 @@ export default function CotizacionesPage() {
       color: #333;
       line-height: 1.5;
       background: white;
+      /* Agregar margen al body para compensar */
+      padding: 15mm;
     }
     .container {
       max-width: 100%;
