@@ -72,7 +72,15 @@ export default function InventarioPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  
+  // Import state
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importAnalysis, setImportAnalysis] = useState<any>(null);
+  const [importUpdateMode, setImportUpdateMode] = useState('sum');
+  const [importUpdatePrices, setImportUpdatePrices] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // Form
   const [formData, setFormData] = useState({
@@ -334,6 +342,7 @@ export default function InventarioPage() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
+        setIsAnalyzing(true);
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
@@ -342,10 +351,12 @@ export default function InventarioPage() {
 
         if (data.length === 0) {
           toast({ title: 'Error', description: 'El archivo está vacío', variant: 'destructive' });
+          setIsAnalyzing(false);
           return;
         }
 
-        const response = await fetch('/api/inventory', {
+        // Analizar datos antes de importar
+        const response = await fetch('/api/inventory?mode=analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
@@ -354,15 +365,53 @@ export default function InventarioPage() {
         if (!response.ok) throw new Error();
         const result = await response.json();
         
-        toast({ title: 'Éxito', description: `Se importaron ${result.count} productos`, variant: 'success' });
-        fetchInventory();
-        fetchMarcas();
+        setImportData(data);
+        setImportAnalysis(result.analysis);
+        setImportDialogOpen(true);
       } catch {
-        toast({ title: 'Error', description: 'Error al importar el archivo', variant: 'destructive' });
+        toast({ title: 'Error', description: 'Error al analizar el archivo', variant: 'destructive' });
+      } finally {
+        setIsAnalyzing(false);
       }
     };
     reader.readAsBinaryString(file);
     e.target.value = '';
+  };
+
+  // Ejecutar importación
+  const executeImport = async () => {
+    try {
+      setIsSubmitting(true);
+      const params = new URLSearchParams({
+        mode: 'import',
+        updateMode: importUpdateMode,
+        updatePrices: importUpdatePrices.toString(),
+      });
+
+      const response = await fetch(`/api/inventory?${params}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(importData),
+      });
+
+      if (!response.ok) throw new Error();
+      const result = await response.json();
+      
+      toast({ 
+        title: 'Importación Exitosa', 
+        description: `${result.inserted} nuevos, ${result.updated} actualizados`,
+        variant: 'success' 
+      });
+      setImportDialogOpen(false);
+      setImportAnalysis(null);
+      setImportData([]);
+      fetchInventory();
+      fetchMarcas();
+    } catch {
+      toast({ title: 'Error', description: 'Error al importar productos', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openEditDialog = (item: InventoryItem) => {
@@ -401,10 +450,16 @@ export default function InventarioPage() {
             <Plus className="mr-2 h-4 w-4" /> Agregar
           </Button>
           <label className="cursor-pointer">
-            <Button variant="outline" asChild>
-              <span><Upload className="mr-2 h-4 w-4" /> Importar</span>
+            <Button variant="outline" asChild disabled={isAnalyzing}>
+              <span>
+                {isAnalyzing ? (
+                  <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" /> Analizando...</>
+                ) : (
+                  <><Upload className="mr-2 h-4 w-4" /> Importar</>
+                )}
+              </span>
             </Button>
-            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={isAnalyzing} />
           </label>
           <Button variant="outline" onClick={handleExport} disabled={items.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar
@@ -792,6 +847,132 @@ export default function InventarioPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Importación Inteligente */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Importación Inteligente</DialogTitle>
+            <DialogDescription>
+              Analiza tu archivo y decide cómo importar los productos
+            </DialogDescription>
+          </DialogHeader>
+          
+          {importAnalysis && (
+            <div className="space-y-4">
+              {/* Resumen */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-3xl font-bold text-primary">{importAnalysis.total}</div>
+                    <p className="text-sm text-muted-foreground">Total en archivo</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-green-200 dark:border-green-800">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-3xl font-bold text-green-600">{importAnalysis.new}</div>
+                    <p className="text-sm text-muted-foreground">Productos Nuevos</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-3xl font-bold text-blue-600">{importAnalysis.existing}</div>
+                    <p className="text-sm text-muted-foreground">Ya Existentes</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Opciones para productos existentes */}
+              {importAnalysis.existing > 0 && (
+                <div className="space-y-4 p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium">Opciones para {importAnalysis.existing} productos existentes:</h4>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>¿Qué hacer con la cantidad?</Label>
+                      <Select value={importUpdateMode} onValueChange={setImportUpdateMode}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sum">➕ Sumar al stock actual (reabastecer)</SelectItem>
+                          <SelectItem value="replace">🔄 Reemplazar cantidad existente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {importUpdateMode === 'sum' 
+                          ? 'Ejemplo: Si tienes 10 y el Excel dice 5, tendrás 15'
+                          : 'Ejemplo: Si tienes 10 y el Excel dice 5, tendrás 5'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>¿Actualizar precios del Excel?</Label>
+                        <p className="text-xs text-muted-foreground">
+                          {importUpdatePrices 
+                            ? 'Los precios se actualizarán con los del Excel'
+                            : 'Los precios existentes se mantendrán'}
+                        </p>
+                      </div>
+                      <Button
+                        variant={importUpdatePrices ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setImportUpdatePrices(!importUpdatePrices)}
+                      >
+                        {importUpdatePrices ? 'Sí' : 'No'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview de nuevos */}
+              {importAnalysis.new > 0 && importAnalysis.newItems?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-green-600">Productos nuevos (preview):</h4>
+                  <div className="max-h-32 overflow-y-auto text-sm">
+                    {importAnalysis.newItems.map((item: any, i: number) => (
+                      <div key={i} className="py-1 border-b last:border-0">
+                        <strong>{item.marca}</strong> - {item.amperaje} ({item.cantidad} uds)
+                      </div>
+                    ))}
+                    {importAnalysis.new > 10 && (
+                      <p className="text-muted-foreground">...y {importAnalysis.new - 10} más</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview de existentes */}
+              {importAnalysis.existing > 0 && importAnalysis.updateItems?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium text-blue-600">Se actualizarán (preview):</h4>
+                  <div className="max-h-32 overflow-y-auto text-sm">
+                    {importAnalysis.updateItems.map((item: any, i: number) => (
+                      <div key={i} className="py-1 border-b last:border-0">
+                        <strong>{item.marca}</strong> - {item.amperaje}: {item.existingCantidad} → {importUpdateMode === 'sum' ? item.existingCantidad + item.cantidad : item.cantidad}
+                      </div>
+                    ))}
+                    {importAnalysis.existing > 10 && (
+                      <p className="text-muted-foreground">...y {importAnalysis.existing - 10} más</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportAnalysis(null); }}>
+              Cancelar
+            </Button>
+            <Button onClick={executeImport} disabled={isSubmitting}>
+              {isSubmitting ? 'Importando...' : `Importar ${importAnalysis?.total || 0} productos`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

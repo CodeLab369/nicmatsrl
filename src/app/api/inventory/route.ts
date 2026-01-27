@@ -108,28 +108,119 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Crear producto
+// POST - Crear producto o importación inteligente
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Si es importación masiva
+    // Si es importación masiva inteligente
     if (Array.isArray(body)) {
+      const { searchParams } = new URL(request.url);
+      const mode = searchParams.get('mode'); // 'analyze', 'import'
+      const updateMode = searchParams.get('updateMode') || 'sum'; // 'sum' o 'replace'
+      const updatePrices = searchParams.get('updatePrices') === 'true';
+
+      // Normalizar datos del Excel
       const items = body.map(item => ({
-        marca: item.marca || item.Marca,
-        amperaje: item.amperaje || item.Amperaje,
+        marca: (item.marca || item.Marca || '').toString().trim(),
+        amperaje: (item.amperaje || item.Amperaje || '').toString().trim(),
         cantidad: parseInt(item.cantidad || item.Cantidad) || 0,
         costo: parseFloat(item.costo || item.Costo) || 0,
-        precio_venta: parseFloat(item.precio_venta || item['Precio de Venta'] || item.PrecioVenta) || 0,
-      }));
+        precio_venta: parseFloat(item.precio_venta || item['Precio de Venta'] || item.PrecioVenta || item.precioVenta) || 0,
+      })).filter(item => item.marca && item.amperaje);
 
-      const { data, error } = await supabase
+      if (items.length === 0) {
+        return NextResponse.json({ error: 'No se encontraron productos válidos en el archivo' }, { status: 400 });
+      }
+
+      // Obtener todos los productos existentes
+      const { data: existing } = await supabase
         .from('inventory')
-        .insert(items)
-        .select();
+        .select('id, marca, amperaje, cantidad, costo, precio_venta');
 
-      if (error) throw error;
-      return NextResponse.json({ success: true, count: data?.length });
+      // Crear mapa de productos existentes (Marca + Amperaje como key)
+      const existingMap = new Map();
+      (existing || []).forEach(item => {
+        const key = `${item.marca.toLowerCase()}|${item.amperaje.toLowerCase()}`;
+        existingMap.set(key, item);
+      });
+
+      // Clasificar productos
+      const newItems: any[] = [];
+      const updateItems: any[] = [];
+
+      items.forEach(item => {
+        const key = `${item.marca.toLowerCase()}|${item.amperaje.toLowerCase()}`;
+        const existingItem = existingMap.get(key);
+        
+        if (existingItem) {
+          updateItems.push({
+            ...item,
+            existingId: existingItem.id,
+            existingCantidad: existingItem.cantidad,
+            existingCosto: existingItem.costo,
+            existingPrecioVenta: existingItem.precio_venta,
+          });
+        } else {
+          newItems.push(item);
+        }
+      });
+
+      // Modo análisis: solo devolver información
+      if (mode === 'analyze') {
+        return NextResponse.json({
+          success: true,
+          analysis: {
+            total: items.length,
+            new: newItems.length,
+            existing: updateItems.length,
+            newItems: newItems.slice(0, 10), // Preview primeros 10
+            updateItems: updateItems.slice(0, 10), // Preview primeros 10
+          }
+        });
+      }
+
+      // Modo importación: ejecutar cambios
+      let insertedCount = 0;
+      let updatedCount = 0;
+
+      // Insertar nuevos productos
+      if (newItems.length > 0) {
+        const { data, error } = await supabase
+          .from('inventory')
+          .insert(newItems)
+          .select();
+        if (error) throw error;
+        insertedCount = data?.length || 0;
+      }
+
+      // Actualizar productos existentes
+      for (const item of updateItems) {
+        const newCantidad = updateMode === 'sum' 
+          ? item.existingCantidad + item.cantidad 
+          : item.cantidad;
+
+        const updateData: any = { cantidad: newCantidad };
+        
+        if (updatePrices) {
+          updateData.costo = item.costo;
+          updateData.precio_venta = item.precio_venta;
+        }
+
+        const { error } = await supabase
+          .from('inventory')
+          .update(updateData)
+          .eq('id', item.existingId);
+
+        if (!error) updatedCount++;
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        inserted: insertedCount,
+        updated: updatedCount,
+        total: insertedCount + updatedCount
+      });
     }
 
     // Producto individual
