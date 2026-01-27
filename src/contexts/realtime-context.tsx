@@ -31,28 +31,30 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     mountedRef.current = true;
     const supabase = createBrowserClient();
     
+    console.log('[Realtime] Iniciando conexión...');
+    
     // Crear UN solo canal para todas las tablas
     const channel = supabase
-      .channel('app-realtime', {
-        config: {
-          broadcast: { self: true },
-        },
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+      .channel('app-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload) => {
+        console.log('[Realtime] Cambio en inventory:', payload);
         subscribers.inventory.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
+        console.log('[Realtime] Cambio en cotizaciones:', payload);
         subscribers.cotizaciones.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, (payload) => {
+        console.log('[Realtime] Cambio en empresa_config:', payload);
         subscribers.empresa_config.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+        console.log('[Realtime] Cambio en users:', payload);
         subscribers.users.forEach(cb => cb());
       })
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (!mountedRef.current) return;
-        console.log('[Realtime] Status:', status);
+        console.log('[Realtime] Status:', status, err ? `Error: ${err.message}` : '');
         setIsConnected(status === 'SUBSCRIBED');
       });
 
