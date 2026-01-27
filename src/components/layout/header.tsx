@@ -52,7 +52,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="xl:hidden"
             onClick={() => setMobileMenuOpen(true)}
           >
             <Menu className="h-5 w-5" />
@@ -60,7 +60,7 @@ export function Header() {
           </Button>
 
           {/* Título de la página (placeholder para breadcrumbs futuros) */}
-          <div className="flex-1 lg:ml-0">
+          <div className="flex-1 xl:ml-0">
             {/* Espacio reservado para breadcrumbs o título dinámico */}
           </div>
 
@@ -126,12 +126,12 @@ export function Header() {
         <>
           {/* Overlay */}
           <div
-            className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-50 bg-black/50 xl:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
           {/* Sidebar */}
           <Sidebar
-            className="lg:hidden animate-slide-in"
+            className="xl:hidden animate-slide-in"
             onNavigate={() => setMobileMenuOpen(false)}
           />
         </>

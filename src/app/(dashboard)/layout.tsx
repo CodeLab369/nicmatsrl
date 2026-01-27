@@ -37,8 +37,8 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <Sidebar className="hidden lg:flex" />
-      <div className="lg:pl-72">
+      <Sidebar className="hidden xl:flex" />
+      <div className="xl:pl-72">
         <Header />
         <main className="p-4 md:p-6 lg:p-8">
           {children}
