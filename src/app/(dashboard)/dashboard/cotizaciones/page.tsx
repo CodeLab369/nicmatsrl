@@ -153,10 +153,10 @@ export default function CotizacionesPage() {
     try {
       const response = await fetch('/api/inventory?limit=1000');
       const data = await response.json();
-      setInventario(data.data || []);
+      setInventario(data.items || []);
       
       // Extraer marcas únicas
-      const marcas = Array.from(new Set((data.data || []).map((i: InventoryItem) => i.marca)));
+      const marcas = Array.from(new Set((data.items || []).map((i: InventoryItem) => i.marca)));
       setMarcasOptions(marcas as string[]);
     } catch (error) {
       console.error('Error:', error);
