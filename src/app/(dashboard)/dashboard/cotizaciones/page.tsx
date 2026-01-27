@@ -557,7 +557,7 @@ export default function CotizacionesPage() {
     }
     .company-info {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 15px;
       flex: 1;
     }
