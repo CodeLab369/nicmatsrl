@@ -635,6 +635,23 @@ export default function CotizacionesPage() {
     .page-break {
       page-break-inside: avoid;
     }
+    /* La tabla puede dividirse entre páginas */
+    table {
+      page-break-inside: auto;
+    }
+    /* Pero el encabezado se repite en cada página */
+    thead {
+      display: table-header-group;
+    }
+    /* Evitar cortar filas a la mitad */
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    /* El tbody puede dividirse */
+    tbody {
+      page-break-inside: auto;
+    }
   </style>
 </head>
 <body>
@@ -688,7 +705,7 @@ export default function CotizacionesPage() {
     </div>
 
     <!-- Tabla de productos -->
-    <table class="page-break">
+    <table>
       <thead>
         <tr>
           <th style="width: 40px; text-align: center;">N°</th>
