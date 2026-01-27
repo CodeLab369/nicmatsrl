@@ -35,20 +35,32 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel('app-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload) => {
-        console.log('[Realtime] Cambio en inventory:', payload.eventType);
-        subscribers.inventory.forEach(cb => cb());
+        console.log('[Realtime] 📦 Cambio en inventory:', payload.eventType, 'Suscriptores:', subscribers.inventory.size);
+        subscribers.inventory.forEach(cb => {
+          console.log('[Realtime] 📦 Ejecutando callback inventory...');
+          cb();
+        });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
-        console.log('[Realtime] Cambio en cotizaciones:', payload.eventType);
-        subscribers.cotizaciones.forEach(cb => cb());
+        console.log('[Realtime] 📋 Cambio en cotizaciones:', payload.eventType, 'Suscriptores:', subscribers.cotizaciones.size);
+        subscribers.cotizaciones.forEach(cb => {
+          console.log('[Realtime] 📋 Ejecutando callback cotizaciones...');
+          cb();
+        });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, (payload) => {
-        console.log('[Realtime] Cambio en empresa_config:', payload.eventType);
-        subscribers.empresa_config.forEach(cb => cb());
+        console.log('[Realtime] ⚙️ Cambio en empresa_config:', payload.eventType, 'Suscriptores:', subscribers.empresa_config.size);
+        subscribers.empresa_config.forEach(cb => {
+          console.log('[Realtime] ⚙️ Ejecutando callback empresa_config...');
+          cb();
+        });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-        console.log('[Realtime] Cambio en users:', payload.eventType);
-        subscribers.users.forEach(cb => cb());
+        console.log('[Realtime] 👤 Cambio en users:', payload.eventType, 'Suscriptores:', subscribers.users.size);
+        subscribers.users.forEach(cb => {
+          console.log('[Realtime] 👤 Ejecutando callback users...');
+          cb();
+        });
       })
       .subscribe((status, err) => {
         console.log('[Realtime] Status:', status, err ? `Error: ${err.message}` : '');
@@ -70,8 +82,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   // Función para suscribirse a una tabla
   const subscribe = useCallback((table: TableName, callback: Callback): (() => void) => {
     subscribers[table].add(callback);
+    console.log(`[Realtime] ✅ Suscrito a ${table}. Total suscriptores: ${subscribers[table].size}`);
     return () => {
       subscribers[table].delete(callback);
+      console.log(`[Realtime] ❌ Desuscrito de ${table}. Total suscriptores: ${subscribers[table].size}`);
     };
   }, []);
 

@@ -167,6 +167,7 @@ export default function InventarioPage() {
 
   // Suscripción a Realtime centralizada
   const isRealtime = useTableSubscription('inventory', () => {
+    console.log('[Inventario] 🔄 Realtime callback ejecutado - refrescando datos...');
     fetchInventory();
     fetchMarcas();
   });
