@@ -229,11 +229,23 @@ export default function CotizacionesPage() {
     fetchEmpresaConfig();
   }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig]);
 
-  // Realtime subscription - mejorada para móviles
+  // Refs para callbacks (evita recrear el canal)
+  const fetchCotizacionesRef = useRef(fetchCotizaciones);
+  const fetchStatsRef = useRef(fetchStats);
+  const fetchEmpresaConfigRef = useRef(fetchEmpresaConfig);
+  
+  useEffect(() => {
+    fetchCotizacionesRef.current = fetchCotizaciones;
+    fetchStatsRef.current = fetchStats;
+    fetchEmpresaConfigRef.current = fetchEmpresaConfig;
+  }, [fetchCotizaciones, fetchStats, fetchEmpresaConfig]);
+
+  // Realtime subscription - estable
   useEffect(() => {
     let reconnectTimeout: NodeJS.Timeout | null = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
+    let isSubscribed = false;
 
     const setupChannel = () => {
       if (channelRef.current) {
@@ -241,22 +253,22 @@ export default function CotizacionesPage() {
       }
 
       const channel = supabase
-        .channel(`cotizaciones-changes-${Date.now()}`, {
-          config: { broadcast: { self: true } },
-        })
+        .channel('cotizaciones-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
-          fetchCotizaciones();
-          fetchStats();
+          fetchCotizacionesRef.current();
+          fetchStatsRef.current();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, () => {
-          fetchEmpresaConfig();
+          fetchEmpresaConfigRef.current();
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
+            isSubscribed = true;
             reconnectAttempts = 0;
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setIsConnected(false);
+            isSubscribed = false;
             if (reconnectAttempts < maxReconnectAttempts) {
               const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
               reconnectTimeout = setTimeout(() => {
@@ -272,35 +284,37 @@ export default function CotizacionesPage() {
 
     setupChannel();
 
-    // Handlers para móviles
+    // Handlers para móviles - solo reconectar si no está conectado
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !isSubscribed) {
         reconnectAttempts = 0;
         setupChannel();
-        fetchCotizaciones();
-        fetchStats();
+      }
+      if (document.visibilityState === 'visible') {
+        fetchCotizacionesRef.current();
+        fetchStatsRef.current();
       }
     };
 
     const handleOnline = () => {
-      reconnectAttempts = 0;
-      setupChannel();
-      fetchCotizaciones();
-      fetchStats();
+      if (!isSubscribed) {
+        reconnectAttempts = 0;
+        setupChannel();
+      }
+      fetchCotizacionesRef.current();
+      fetchStatsRef.current();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('online', handleOnline);
-    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
-      window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [fetchCotizaciones, fetchStats, fetchEmpresaConfig]);
+  }, []); // Sin dependencias - solo se ejecuta una vez
 
   // Actualizar amperajes cuando cambia la marca
   useEffect(() => {

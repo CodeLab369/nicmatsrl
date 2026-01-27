@@ -173,11 +173,21 @@ export default function InventarioPage() {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Suscripción a Realtime de Supabase - mejorada para móviles
+  // Refs para callbacks (evita recrear el canal)
+  const fetchInventoryRef = useRef(fetchInventory);
+  const fetchMarcasRef = useRef(fetchMarcas);
+  
+  useEffect(() => {
+    fetchInventoryRef.current = fetchInventory;
+    fetchMarcasRef.current = fetchMarcas;
+  }, [fetchInventory, fetchMarcas]);
+
+  // Suscripción a Realtime de Supabase - estable
   useEffect(() => {
     let reconnectTimeout: NodeJS.Timeout | null = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
+    let isSubscribed = false;
 
     const setupChannel = () => {
       // Limpiar canal anterior
@@ -187,33 +197,28 @@ export default function InventarioPage() {
 
       // Crear canal de suscripción
       const channel = supabase
-        .channel(`inventory-changes-${Date.now()}`, {
-          config: {
-            broadcast: { self: true },
-          },
-        })
+        .channel('inventory-realtime')
         .on(
           'postgres_changes',
           {
-            event: '*', // INSERT, UPDATE, DELETE
+            event: '*',
             schema: 'public',
             table: 'inventory',
           },
-          (payload) => {
-            console.log('🔄 Cambio en tiempo real:', payload.eventType);
-            // Recargar datos cuando hay cualquier cambio
-            fetchInventory();
-            fetchMarcas();
+          () => {
+            // Usar refs para evitar recrear el canal
+            fetchInventoryRef.current();
+            fetchMarcasRef.current();
           }
         )
         .subscribe((status) => {
-          console.log('📡 Estado Realtime:', status);
           if (status === 'SUBSCRIBED') {
             setIsRealtime(true);
+            isSubscribed = true;
             reconnectAttempts = 0;
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setIsRealtime(false);
-            // Intentar reconectar
+            isSubscribed = false;
             if (reconnectAttempts < maxReconnectAttempts) {
               const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
               reconnectTimeout = setTimeout(() => {
@@ -229,26 +234,29 @@ export default function InventarioPage() {
 
     setupChannel();
 
-    // Manejar visibilidad (importante para Android)
+    // Handlers para móviles - solo reconectar si no está conectado
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !isSubscribed) {
         reconnectAttempts = 0;
         setupChannel();
-        fetchInventory(); // Refrescar datos al volver
+      }
+      if (document.visibilityState === 'visible') {
+        fetchInventoryRef.current();
       }
     };
 
     const handleOnline = () => {
-      reconnectAttempts = 0;
-      setupChannel();
-      fetchInventory();
+      if (!isSubscribed) {
+        reconnectAttempts = 0;
+        setupChannel();
+      }
+      fetchInventoryRef.current();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('online', handleOnline);
-    window.addEventListener('focus', handleVisibilityChange);
 
-    // Cleanup al desmontar
+    // Cleanup
     return () => {
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (channelRef.current) {
@@ -256,9 +264,8 @@ export default function InventarioPage() {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('online', handleOnline);
-      window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [fetchInventory, fetchMarcas]);
+  }, []); // Sin dependencias - solo se ejecuta una vez
 
   // Resetear página al cambiar filtros
   useEffect(() => {
