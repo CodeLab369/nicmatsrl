@@ -28,6 +28,7 @@ export async function GET() {
       telefono_adicional: '',
       email: '',
       logo: null,
+      color_principal: '#1a5f7a',
       prefijo_cotizacion: 'COT',
       siguiente_numero: 1,
       pie_empresa: 'NICMAT S.R.L.',

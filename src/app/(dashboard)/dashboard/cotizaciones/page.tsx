@@ -86,6 +86,7 @@ interface EmpresaConfig {
   pie_empresa: string;
   pie_agradecimiento: string;
   pie_contacto: string;
+  color_principal: string;
 }
 
 const defaultConfig: EmpresaConfig = {
@@ -102,7 +103,8 @@ const defaultConfig: EmpresaConfig = {
   siguiente_numero: 1,
   pie_empresa: 'NICMAT S.R.L.',
   pie_agradecimiento: '¡Gracias por su preferencia!',
-  pie_contacto: ''
+  pie_contacto: '',
+  color_principal: '#1a5f7a'
 };
 
 export default function CotizacionesPage() {
@@ -495,6 +497,21 @@ export default function CotizacionesPage() {
     // Usar configuración de empresa
     const cfg = empresaConfig;
     
+    // Color principal configurable
+    const colorPrincipal = cfg.color_principal || '#1a5f7a';
+    
+    // Función para crear gradiente con el color
+    const gradiente = `linear-gradient(135deg, ${colorPrincipal} 0%, ${adjustColor(colorPrincipal, 40)} 100%)`;
+    
+    // Función para aclarar/oscurecer color
+    function adjustColor(color: string, amount: number): string {
+      const hex = color.replace('#', '');
+      const r = Math.min(255, parseInt(hex.substring(0, 2), 16) + amount);
+      const g = Math.min(255, parseInt(hex.substring(2, 4), 16) + amount);
+      const b = Math.min(255, parseInt(hex.substring(4, 6), 16) + amount);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
     // Logo HTML
     const logoHTML = cfg.logo 
       ? `<img src="${cfg.logo}" alt="Logo" style="width: 70px; height: 70px; object-fit: contain; border-radius: 8px;">`
@@ -521,6 +538,10 @@ export default function CotizacionesPage() {
   <meta charset="UTF-8">
   <title>Cotización ${cot.numero}</title>
   <style>
+    :root {
+      --color-principal: ${colorPrincipal};
+      --gradiente: ${gradiente};
+    }
     @page {
       size: letter;
       margin: 10mm;
@@ -553,7 +574,7 @@ export default function CotizacionesPage() {
       align-items: flex-start;
       margin-bottom: 25px;
       padding-bottom: 20px;
-      border-bottom: 3px solid #1a5f7a;
+      border-bottom: 3px solid var(--color-principal);
     }
     .company-info {
       display: flex;
@@ -564,7 +585,7 @@ export default function CotizacionesPage() {
     .company-logo-placeholder {
       width: 70px;
       height: 70px;
-      background: linear-gradient(135deg, #1a5f7a 0%, #2d8eb4 100%);
+      background: var(--gradiente);
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -580,7 +601,7 @@ export default function CotizacionesPage() {
     .company-name {
       font-size: 24pt;
       font-weight: 700;
-      color: #1a5f7a;
+      color: var(--color-principal);
       margin-bottom: 5px;
     }
     .company-details {
@@ -592,7 +613,7 @@ export default function CotizacionesPage() {
       text-align: right;
     }
     .quote-number {
-      background: linear-gradient(135deg, #1a5f7a 0%, #2d8eb4 100%);
+      background: var(--gradiente);
       color: white;
       padding: 10px 20px;
       border-radius: 8px;
@@ -609,13 +630,13 @@ export default function CotizacionesPage() {
       text-align: center;
       font-size: 20pt;
       font-weight: 700;
-      color: #1a5f7a;
+      color: var(--color-principal);
       margin: 25px 0;
       letter-spacing: 3px;
     }
     .client-box {
       background: #f8f9fa;
-      border-left: 4px solid #1a5f7a;
+      border-left: 4px solid var(--color-principal);
       padding: 15px 20px;
       margin-bottom: 25px;
       border-radius: 0 8px 8px 0;
@@ -623,7 +644,7 @@ export default function CotizacionesPage() {
     .client-title {
       font-size: 10pt;
       font-weight: 600;
-      color: #1a5f7a;
+      color: var(--color-principal);
       margin-bottom: 10px;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -641,7 +662,7 @@ export default function CotizacionesPage() {
     }
     .client-item label {
       font-weight: 600;
-      color: #1a5f7a;
+      color: var(--color-principal);
       white-space: nowrap;
     }
     .client-item label::after {
@@ -656,7 +677,7 @@ export default function CotizacionesPage() {
       margin-bottom: 20px;
     }
     th {
-      background: linear-gradient(135deg, #1a5f7a 0%, #2d8eb4 100%);
+      background: var(--gradiente);
       color: white;
       padding: 12px;
       text-align: left;
@@ -692,7 +713,7 @@ export default function CotizacionesPage() {
       border-bottom: none;
     }
     .total-row.highlight {
-      background: linear-gradient(135deg, #1a5f7a 0%, #2d8eb4 100%);
+      background: var(--gradiente);
       color: white;
     }
     .total-label {
@@ -737,7 +758,7 @@ export default function CotizacionesPage() {
     .terms-title {
       font-size: 10pt;
       font-weight: 600;
-      color: #1a5f7a;
+      color: var(--color-principal);
       margin-bottom: 8px;
       text-transform: uppercase;
     }
@@ -755,7 +776,7 @@ export default function CotizacionesPage() {
     .footer-company {
       font-size: 12pt;
       font-weight: 600;
-      color: #1a5f7a;
+      color: var(--color-principal);
     }
     .footer-thanks {
       font-size: 10pt;
@@ -1695,6 +1716,42 @@ export default function CotizacionesPage() {
                     onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_adicional: e.target.value }))}
                     placeholder="+591 70000000"
                   />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Color Principal */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                🎨 Color Principal del PDF
+              </Label>
+              <div className="flex items-center gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-color">Seleccionar Color</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      id="cfg-color"
+                      value={configForm.color_principal}
+                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
+                      className="w-12 h-10 rounded cursor-pointer border-0"
+                    />
+                    <Input
+                      value={configForm.color_principal}
+                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
+                      placeholder="#1a5f7a"
+                      className="w-28 font-mono"
+                    />
+                    <div 
+                      className="h-10 px-4 rounded flex items-center text-white font-semibold text-sm"
+                      style={{ background: `linear-gradient(135deg, ${configForm.color_principal} 0%, ${configForm.color_principal}99 100%)` }}
+                    >
+                      Vista previa
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Este color se aplicará a títulos, encabezados de tabla, badges y acentos del PDF</p>
                 </div>
               </div>
             </div>
