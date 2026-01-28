@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario';
+type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence';
 type Callback = () => void;
 
 interface RealtimeContextType {
@@ -22,6 +22,7 @@ const subscribers: Record<TableName, Set<Callback>> = {
   users: new Set(),
   tiendas: new Set(),
   tienda_inventario: new Set(),
+  user_presence: new Set(),
 };
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
@@ -75,6 +76,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         console.log('[Realtime] 📦🏪 Cambio en tienda_inventario:', payload.eventType, 'Suscriptores:', subscribers.tienda_inventario.size);
         subscribers.tienda_inventario.forEach(cb => {
           console.log('[Realtime] 📦🏪 Ejecutando callback tienda_inventario...');
+          cb();
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, (payload) => {
+        console.log('[Realtime] 🟢 Cambio en user_presence:', payload.eventType, 'Suscriptores:', subscribers.user_presence.size);
+        subscribers.user_presence.forEach(cb => {
+          console.log('[Realtime] 🟢 Ejecutando callback user_presence...');
           cb();
         });
       })
