@@ -103,16 +103,16 @@ export async function GET(request: NextRequest) {
     const statsData = statsResult.data || [];
     const stats = {
       productos: statsData.length,
-      unidadesTotales: statsData.reduce((acc, item) => acc + (item.cantidad || 0), 0),
-      costoTotal: statsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0),
-      valorVenta: statsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0),
+      unidadesTotales: statsData.reduce((acc: number, item: { cantidad?: number }) => acc + (item.cantidad || 0), 0),
+      costoTotal: statsData.reduce((acc: number, item: { cantidad?: number; costo?: number }) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0),
+      valorVenta: statsData.reduce((acc: number, item: { cantidad?: number; precio_venta?: number }) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0),
     };
 
     const globalStatsData = globalStatsResult.data || [];
     const totalProducts = globalStatsData.length;
-    const totalUnits = globalStatsData.reduce((acc, item) => acc + (item.cantidad || 0), 0);
-    const totalCost = globalStatsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0);
-    const totalSaleValue = globalStatsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0);
+    const totalUnits = globalStatsData.reduce((acc: number, item: { cantidad?: number }) => acc + (item.cantidad || 0), 0);
+    const totalCost = globalStatsData.reduce((acc: number, item: { cantidad?: number; costo?: number }) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0);
+    const totalSaleValue = globalStatsData.reduce((acc: number, item: { cantidad?: number; precio_venta?: number }) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0);
 
     return NextResponse.json({
       items: mainResult.data || [],
