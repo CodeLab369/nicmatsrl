@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
     // Listar con paginación
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
     const tipo = searchParams.get('tipo') || '';
+    const ciudad = searchParams.get('ciudad') || '';
 
     const offset = (page - 1) * limit;
 
@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
       .from('tiendas')
       .select('*', { count: 'exact' });
 
-    if (search) {
-      query = query.or(`nombre.ilike.%${search}%,encargado.ilike.%${search}%,ciudad.ilike.%${search}%`);
-    }
     if (tipo && tipo !== '_all') {
       query = query.eq('tipo', tipo);
+    }
+    if (ciudad && ciudad !== '_all') {
+      query = query.eq('ciudad', ciudad);
     }
 
     const { data, error, count } = await query
@@ -62,19 +62,23 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     // Estadísticas
-    const { data: allTiendas } = await supabase.from('tiendas').select('tipo');
+    const { data: allTiendas } = await supabase.from('tiendas').select('tipo, ciudad');
     const stats = {
       total: allTiendas?.length || 0,
       casaMatriz: allTiendas?.filter(t => t.tipo === 'casa_matriz').length || 0,
       sucursales: allTiendas?.filter(t => t.tipo === 'sucursal').length || 0,
     };
 
+    // Ciudades únicas para el filtro
+    const ciudades = Array.from(new Set(allTiendas?.map(t => t.ciudad).filter(Boolean))).sort() as string[];
+
     return NextResponse.json({
       tiendas: data || [],
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / limit),
-      stats
+      stats,
+      ciudades
     });
 
   } catch (error) {

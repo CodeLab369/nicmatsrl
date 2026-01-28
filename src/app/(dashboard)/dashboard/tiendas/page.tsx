@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
-  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown
+  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -88,8 +88,20 @@ export default function TiendasPage() {
   const [tiendaTotalPages, setTiendaTotalPages] = useState(1);
   const [tiendaSearch, setTiendaSearch] = useState('');
   const [tiendaFilterMarca, setTiendaFilterMarca] = useState('_all');
+  const [tiendaFilterAmperaje, setTiendaFilterAmperaje] = useState('_all');
   const [tiendaMarcas, setTiendaMarcas] = useState<string[]>([]);
+  const [tiendaAmperajes, setTiendaAmperajes] = useState<string[]>([]);
   const [loadingTiendaInv, setLoadingTiendaInv] = useState(false);
+  const [filterCiudad, setFilterCiudad] = useState('_all');
+  const [ciudades, setCiudades] = useState<string[]>([]);
+  
+  // Dialog ver tienda
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingTienda, setViewingTienda] = useState<Tienda | null>(null);
+  
+  // Dialog devolver inventario
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
   
   // Formulario crear/editar tienda
   const [showForm, setShowForm] = useState(false);
@@ -122,8 +134,8 @@ export default function TiendasPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        search,
-        tipo: filterTipo
+        tipo: filterTipo,
+        ciudad: filterCiudad
       });
       
       const response = await fetch(`/api/tiendas?${params}`);
@@ -133,12 +145,13 @@ export default function TiendasPage() {
       setTotal(data.total || 0);
       setTotalPages(data.totalPages || 1);
       if (data.stats) setStats(data.stats);
+      if (data.ciudades) setCiudades(data.ciudades);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, filterTipo]);
+  }, [page, limit, filterTipo, filterCiudad]);
 
   // Fetch inventario de tienda seleccionada
   const fetchTiendaInventory = useCallback(async () => {
@@ -150,8 +163,8 @@ export default function TiendasPage() {
         tiendaId: selectedTienda.id,
         page: tiendaPage.toString(),
         limit: tiendaLimit.toString(),
-        search: tiendaSearch,
-        marca: tiendaFilterMarca
+        marca: tiendaFilterMarca,
+        amperaje: tiendaFilterAmperaje
       });
       
       const response = await fetch(`/api/tienda-inventario?${params}`);
@@ -162,12 +175,13 @@ export default function TiendasPage() {
       setTiendaTotalPages(data.totalPages || 1);
       if (data.stats) setTiendaStats(data.stats);
       if (data.marcas) setTiendaMarcas(data.marcas);
+      if (data.amperajes) setTiendaAmperajes(data.amperajes);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoadingTiendaInv(false);
     }
-  }, [selectedTienda, tiendaPage, tiendaLimit, tiendaSearch, tiendaFilterMarca]);
+  }, [selectedTienda, tiendaPage, tiendaLimit, tiendaFilterMarca, tiendaFilterAmperaje]);
 
   // Fetch inventario central para transferencia
   const fetchInventarioCentral = useCallback(async () => {
@@ -209,11 +223,16 @@ export default function TiendasPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterTipo, limit]);
+  }, [filterTipo, filterCiudad, limit]);
 
   useEffect(() => {
     setTiendaPage(1);
-  }, [tiendaSearch, tiendaFilterMarca, tiendaLimit]);
+    setTiendaFilterAmperaje('_all'); // Reset amperaje al cambiar marca
+  }, [tiendaFilterMarca, tiendaLimit]);
+
+  useEffect(() => {
+    setTiendaPage(1);
+  }, [tiendaFilterAmperaje]);
 
   // Suscripción Realtime
   const isConnected = useTableSubscription('tiendas', fetchTiendas);
@@ -299,12 +318,55 @@ export default function TiendasPage() {
     setFormData({ nombre: '', tipo: 'sucursal', encargado: '', ciudad: '', direccion: '' });
   };
 
+  const handleViewTienda = (tienda: Tienda) => {
+    setViewingTienda(tienda);
+    setViewDialogOpen(true);
+  };
+
   const handleOpenTransfer = async () => {
     if (!selectedTienda) return;
     setTransferDialogOpen(true);
     setTransferSearch('');
     setTransferFilterMarca('_all');
     await fetchInventarioCentral();
+  };
+
+  // Devolver todo el inventario de la tienda al inventario principal
+  const handleReturnAllInventory = async () => {
+    if (!selectedTienda) return;
+    
+    try {
+      setIsReturning(true);
+      const response = await fetch('/api/tienda-inventario', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tiendaId: selectedTienda.id,
+          returnAll: true
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) throw new Error(data.error);
+
+      toast({ 
+        title: 'Inventario devuelto', 
+        description: data.message, 
+        variant: 'success' 
+      });
+
+      setReturnDialogOpen(false);
+      fetchTiendaInventory();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al devolver inventario', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsReturning(false);
+    }
   };
 
   const handleTransferItemChange = (id: string, field: 'selected' | 'cantidadEnviar', value: boolean | number) => {
@@ -540,15 +602,17 @@ export default function TiendasPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-lg">Lista de Tiendas</CardTitle>
               <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar..."
-                    className="pl-9 w-40"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
+                <Select value={filterCiudad} onValueChange={setFilterCiudad}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Ciudad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todas las ciudades</SelectItem>
+                    {ciudades.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select value={filterTipo} onValueChange={setFilterTipo}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="Tipo" />
@@ -605,6 +669,9 @@ export default function TiendasPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleViewTienda(tienda); }}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(tienda); }}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -652,10 +719,16 @@ export default function TiendasPage() {
                 )}
               </div>
               {selectedTienda && (
-                <Button onClick={handleOpenTransfer} className="gap-2">
-                  <Send className="h-4 w-4" />
-                  Enviar Productos
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => setReturnDialogOpen(true)} className="gap-2" disabled={tiendaStats.totalUnidades === 0}>
+                    <Undo2 className="h-4 w-4" />
+                    Devolver Todo
+                  </Button>
+                  <Button onClick={handleOpenTransfer} className="gap-2">
+                    <Send className="h-4 w-4" />
+                    Enviar Productos
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
@@ -685,23 +758,25 @@ export default function TiendasPage() {
 
                 {/* Filtros */}
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar producto..."
-                      className="pl-9"
-                      value={tiendaSearch}
-                      onChange={(e) => setTiendaSearch(e.target.value)}
-                    />
-                  </div>
                   <Select value={tiendaFilterMarca} onValueChange={setTiendaFilterMarca}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-36">
                       <SelectValue placeholder="Marca" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_all">Todas</SelectItem>
+                      <SelectItem value="_all">Todas las marcas</SelectItem>
                       {tiendaMarcas.map(m => (
                         <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={tiendaFilterAmperaje} onValueChange={setTiendaFilterAmperaje}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Amperaje" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_all">Todos los amperajes</SelectItem>
+                      {tiendaAmperajes.map(a => (
+                        <SelectItem key={a} value={a}>{a}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -968,6 +1043,75 @@ export default function TiendasPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Ver Tienda */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Información de Tienda
+            </DialogTitle>
+          </DialogHeader>
+          {viewingTienda && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-lg">{viewingTienda.nombre}</span>
+                {getTipoBadge(viewingTienda.tipo)}
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Encargado</p>
+                    <p className="font-medium">{viewingTienda.encargado || 'Sin asignar'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Ciudad</p>
+                    <p className="font-medium">{viewingTienda.ciudad || 'No especificada'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Dirección</p>
+                    <p className="font-medium">{viewingTienda.direccion || 'No especificada'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Devolver Inventario */}
+      <AlertDialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5" />
+              ¿Devolver todo el inventario?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Se devolverán <strong>{tiendaStats.totalUnidades} unidades</strong> de <strong>{tiendaStats.totalProductos} productos</strong> al inventario principal.
+              <br /><br />
+              Esta acción sumará las cantidades al inventario central y vaciará el inventario de la tienda "{selectedTienda?.nombre}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReturning}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReturnAllInventory} disabled={isReturning}>
+              {isReturning ? 'Devolviendo...' : 'Confirmar Devolución'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     const tiendaId = searchParams.get('tiendaId');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
     const marca = searchParams.get('marca') || '';
+    const amperaje = searchParams.get('amperaje') || '';
 
     if (!tiendaId) {
       return NextResponse.json({ error: 'tiendaId requerido' }, { status: 400 });
@@ -27,11 +27,11 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .eq('tienda_id', tiendaId);
 
-    if (search) {
-      query = query.or(`marca.ilike.%${search}%,amperaje.ilike.%${search}%`);
-    }
     if (marca && marca !== '_all') {
       query = query.eq('marca', marca);
+    }
+    if (amperaje && amperaje !== '_all') {
+      query = query.eq('amperaje', amperaje);
     }
 
     const { data, error, count } = await query
@@ -41,10 +41,10 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Estadísticas de la tienda (incluir marca para filtrar)
+    // Estadísticas de la tienda (incluir marca y amperaje para filtrar)
     const { data: allItems } = await supabase
       .from('tienda_inventario')
-      .select('marca, cantidad, costo, precio_venta')
+      .select('marca, amperaje, cantidad, costo, precio_venta')
       .eq('tienda_id', tiendaId);
 
     const stats = {
@@ -56,6 +56,14 @@ export async function GET(request: NextRequest) {
 
     // Obtener marcas únicas de la tienda
     const marcas = Array.from(new Set(allItems?.map(i => i.marca) || [])).filter(Boolean).sort();
+    
+    // Obtener amperajes filtrados por marca seleccionada
+    let amperajes: string[] = [];
+    if (marca && marca !== '_all') {
+      amperajes = Array.from(new Set(allItems?.filter(i => i.marca === marca).map(i => i.amperaje) || [])).filter(Boolean).sort() as string[];
+    } else {
+      amperajes = Array.from(new Set(allItems?.map(i => i.amperaje) || [])).filter(Boolean).sort() as string[];
+    }
 
     return NextResponse.json({
       items: data || [],
@@ -63,7 +71,8 @@ export async function GET(request: NextRequest) {
       page,
       totalPages: Math.ceil((count || 0) / limit),
       stats,
-      marcas
+      marcas,
+      amperajes
     });
 
   } catch (error) {
@@ -232,10 +241,78 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Eliminar producto de tienda (devolver a inventario central)
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    const returnToInventory = searchParams.get('returnToInventory') === 'true';
+    const body = await request.json().catch(() => ({}));
+    const { tiendaId, returnAll, id, returnToInventory } = body;
 
+    // Devolver TODO el inventario de una tienda
+    if (returnAll && tiendaId) {
+      // Obtener todos los items de la tienda
+      const { data: tiendaItems, error: fetchError } = await supabase
+        .from('tienda_inventario')
+        .select('*')
+        .eq('tienda_id', tiendaId);
+
+      if (fetchError) throw fetchError;
+
+      if (!tiendaItems || tiendaItems.length === 0) {
+        return NextResponse.json({ message: 'No hay inventario para devolver' });
+      }
+
+      let devueltos = 0;
+      const errores: string[] = [];
+
+      for (const item of tiendaItems) {
+        try {
+          // Buscar si existe en inventario central
+          const { data: inventoryItem } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('marca', item.marca)
+            .eq('amperaje', item.amperaje)
+            .single();
+
+          if (inventoryItem) {
+            // Sumar al existente
+            await supabase
+              .from('inventory')
+              .update({
+                cantidad: inventoryItem.cantidad + item.cantidad,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', inventoryItem.id);
+          } else {
+            // Crear nuevo en inventario central
+            await supabase
+              .from('inventory')
+              .insert({
+                marca: item.marca,
+                amperaje: item.amperaje,
+                cantidad: item.cantidad,
+                costo: item.costo,
+                precio_venta: item.precio_venta,
+              });
+          }
+
+          devueltos++;
+        } catch (err) {
+          errores.push(`${item.marca} ${item.amperaje}`);
+        }
+      }
+
+      // Eliminar todos los items de la tienda
+      await supabase
+        .from('tienda_inventario')
+        .delete()
+        .eq('tienda_id', tiendaId);
+
+      return NextResponse.json({ 
+        message: `Se devolvieron ${devueltos} productos al inventario principal`,
+        devueltos,
+        errores
+      });
+    }
+
+    // Eliminar un solo producto
     if (!id) {
       return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
     }
