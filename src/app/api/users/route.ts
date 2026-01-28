@@ -7,17 +7,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// GET - Listar usuarios
+// Permisos por defecto
+const DEFAULT_PERMISSIONS = {
+  inventario: true,
+  tiendas: true,
+  cotizaciones: true,
+};
+
+// GET - Listar usuarios con presencia
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, username, full_name, role, is_active, last_login, created_at, updated_at')
-      .order('created_at', { ascending: false });
+    // Obtener usuarios y presencia en paralelo
+    const [usersResult, presenceResult] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at, permissions')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('user_presence')
+        .select('user_id, is_online, last_seen')
+    ]);
 
-    if (error) throw error;
+    if (usersResult.error) throw usersResult.error;
 
-    const users = (data || []).map((u) => ({
+    // Crear mapa de presencia
+    const presenceMap = new Map(
+      (presenceResult.data || []).map(p => [p.user_id, { isOnline: p.is_online, lastSeen: p.last_seen }])
+    );
+
+    const users = (usersResult.data || []).map((u) => ({
       id: u.id,
       username: u.username,
       fullName: u.full_name,
@@ -26,6 +44,9 @@ export async function GET() {
       lastLogin: u.last_login,
       createdAt: u.created_at,
       updatedAt: u.updated_at,
+      permissions: u.permissions || DEFAULT_PERMISSIONS,
+      isOnline: presenceMap.get(u.id)?.isOnline || false,
+      lastSeen: presenceMap.get(u.id)?.lastSeen || null,
     }));
 
     return NextResponse.json({ users });
@@ -38,7 +59,7 @@ export async function GET() {
 // POST - Crear usuario
 export async function POST(request: NextRequest) {
   try {
-    const { username, password, fullName, role } = await request.json();
+    const { username, password, fullName, role, permissions } = await request.json();
 
     if (!username || !password || !fullName || !role) {
       return NextResponse.json(
@@ -64,7 +85,7 @@ export async function POST(request: NextRequest) {
     // Hash de la contraseña
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Crear usuario
+    // Crear usuario con permisos
     const { data: userData, error: userError } = await supabase
       .from('users')
       .insert({
@@ -73,8 +94,9 @@ export async function POST(request: NextRequest) {
         full_name: fullName,
         role,
         is_active: true,
+        permissions: permissions || DEFAULT_PERMISSIONS,
       })
-      .select('id, username, full_name, role, is_active, created_at')
+      .select('id, username, full_name, role, is_active, created_at, permissions')
       .single();
 
     if (userError) {
@@ -125,7 +147,7 @@ export async function DELETE(request: NextRequest) {
 // PATCH - Actualizar usuario
 export async function PATCH(request: NextRequest) {
   try {
-    const { id, username, fullName, role, isActive, newPassword } = await request.json();
+    const { id, username, fullName, role, isActive, newPassword, permissions } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });
@@ -149,7 +171,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Preparar datos de actualización
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
@@ -157,6 +179,7 @@ export async function PATCH(request: NextRequest) {
     if (fullName) updateData.full_name = fullName;
     if (role) updateData.role = role;
     if (isActive !== undefined) updateData.is_active = isActive;
+    if (permissions) updateData.permissions = permissions;
 
     // Si hay nueva contraseña, hashearla
     if (newPassword) {
@@ -171,6 +194,14 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       console.error('Update error:', error);
       return NextResponse.json({ error: 'Error al actualizar el usuario' }, { status: 500 });
+    }
+
+    // Si el usuario fue desactivado, eliminar su presencia para forzar logout
+    if (isActive === false) {
+      await supabase
+        .from('user_presence')
+        .delete()
+        .eq('user_id', id);
     }
 
     return NextResponse.json({ success: true });

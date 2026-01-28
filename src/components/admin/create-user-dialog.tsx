@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserSchema, CreateUserFormData } from '@/lib/validations';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, USER_ROLES } from '@/lib/constants';
+import { UserPermissions } from '@/types';
 import {
   Button,
   Dialog,
@@ -22,6 +23,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Checkbox,
 } from '@/components/ui';
 
 interface CreateUserDialogProps {
@@ -38,6 +40,11 @@ export function CreateUserDialog({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>({
+    inventario: true,
+    tiendas: true,
+    cotizaciones: true,
+  });
   const { toast } = useToast();
 
   const {
@@ -75,6 +82,7 @@ export function CreateUserDialog({
           password: data.password,
           fullName: data.fullName,
           role: data.role,
+          permissions,
         }),
       });
 
@@ -112,6 +120,7 @@ export function CreateUserDialog({
 
   const handleClose = () => {
     reset();
+    setPermissions({ inventario: true, tiendas: true, cotizaciones: true });
     onOpenChange(false);
   };
 
@@ -172,6 +181,64 @@ export function CreateUserDialog({
                 <SelectItem value={USER_ROLES.USER}>Usuario</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Permisos */}
+          <div className="space-y-2">
+            <Label>Permisos de Módulos</Label>
+            <div className="grid grid-cols-1 gap-2 rounded-md border p-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="perm-inventario"
+                  checked={permissions.inventario}
+                  onCheckedChange={(checked) =>
+                    setPermissions({ ...permissions, inventario: !!checked })
+                  }
+                  disabled={isSubmitting}
+                />
+                <label
+                  htmlFor="perm-inventario"
+                  className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
+                >
+                  <Package className="h-4 w-4 text-blue-500" />
+                  Inventario
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="perm-tiendas"
+                  checked={permissions.tiendas}
+                  onCheckedChange={(checked) =>
+                    setPermissions({ ...permissions, tiendas: !!checked })
+                  }
+                  disabled={isSubmitting}
+                />
+                <label
+                  htmlFor="perm-tiendas"
+                  className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
+                >
+                  <Store className="h-4 w-4 text-green-500" />
+                  Tiendas
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="perm-cotizaciones"
+                  checked={permissions.cotizaciones}
+                  onCheckedChange={(checked) =>
+                    setPermissions({ ...permissions, cotizaciones: !!checked })
+                  }
+                  disabled={isSubmitting}
+                />
+                <label
+                  htmlFor="perm-cotizaciones"
+                  className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
+                >
+                  <FileText className="h-4 w-4 text-orange-500" />
+                  Cotizaciones
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Contraseña */}

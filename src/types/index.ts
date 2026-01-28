@@ -10,6 +10,16 @@ export interface BaseEntity {
 }
 
 /**
+ * Permisos de módulos del sistema
+ */
+export interface UserPermissions {
+  inventario: boolean;
+  tiendas: boolean;
+  cotizaciones: boolean;
+  [key: string]: boolean; // Para módulos futuros
+}
+
+/**
  * Usuario del sistema
  */
 export interface User extends BaseEntity {
@@ -18,6 +28,9 @@ export interface User extends BaseEntity {
   role: UserRole;
   isActive: boolean;
   lastLogin?: string;
+  permissions?: UserPermissions;
+  isOnline?: boolean;
+  lastSeen?: string;
 }
 
 /**

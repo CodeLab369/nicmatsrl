@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, USER_ROLES } from '@/lib/constants';
-import { User } from '@/types';
+import { User, UserPermissions } from '@/types';
 import {
   Button,
   Dialog,
@@ -24,6 +24,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Checkbox,
 } from '@/components/ui';
 
 interface EditUserDialogProps {
@@ -41,6 +42,11 @@ export function EditUserDialog({
 }: EditUserDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>({
+    inventario: true,
+    tiendas: true,
+    cotizaciones: true,
+  });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -74,6 +80,12 @@ export function EditUserDialog({
       isActive: user.isActive,
       newPassword: '',
     });
+    // Restaurar permisos del usuario
+    setPermissions(user.permissions || {
+      inventario: true,
+      tiendas: true,
+      cotizaciones: true,
+    });
   }, [user, reset]);
 
   const onSubmit = async (data: UpdateUserFormData) => {
@@ -93,6 +105,7 @@ export function EditUserDialog({
           role: data.role,
           isActive: data.isActive,
           newPassword: data.newPassword || undefined,
+          permissions,
         }),
       });
 
@@ -221,6 +234,52 @@ export function EditUserDialog({
                 No puedes desactivar tu propia cuenta
               </p>
             )}
+          </div>
+
+          {/* Permisos de módulos */}
+          <div className="space-y-3">
+            <Label>Permisos de Módulos</Label>
+            <div className="grid grid-cols-1 gap-3 p-3 bg-muted/50 rounded-lg">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.inventario}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, inventario: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Inventario</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.tiendas}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, tiendas: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <Store className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Tiendas</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.cotizaciones}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, cotizaciones: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Cotizaciones</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Nueva contraseña (opcional) */}

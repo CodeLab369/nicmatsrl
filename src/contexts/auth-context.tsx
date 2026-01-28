@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import { ROUTES, ERROR_MESSAGES } from '@/lib/constants';
@@ -16,10 +16,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Intervalo de heartbeat (30 segundos)
+const HEARTBEAT_INTERVAL = 30000;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enviar heartbeat de presencia
+  const sendHeartbeat = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch('/api/auth/presence', { method: 'POST' });
+      const data = await response.json();
+      
+      // Si el usuario fue desactivado, forzar logout
+      if (data.forceLogout) {
+        console.log('Usuario desactivado, cerrando sesión...');
+        setUser(null);
+        router.push(ROUTES.LOGIN);
+      }
+    } catch (error) {
+      console.error('Heartbeat error:', error);
+    }
+  }, [user, router]);
 
   // Verificar sesión al cargar
   const checkSession = useCallback(async () => {
@@ -43,6 +66,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkSession();
   }, [checkSession]);
+
+  // Iniciar heartbeat cuando hay usuario
+  useEffect(() => {
+    if (user) {
+      // Enviar heartbeat inmediatamente
+      sendHeartbeat();
+      
+      // Configurar intervalo
+      heartbeatRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
+      
+      // Enviar presencia offline al cerrar/recargar
+      const handleBeforeUnload = () => {
+        navigator.sendBeacon('/api/auth/presence', JSON.stringify({ offline: true }));
+      };
+      
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      return () => {
+        if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current);
+        }
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    } else {
+      // Limpiar intervalo si no hay usuario
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    }
+  }, [user, sendHeartbeat]);
 
   const login = useCallback(async (username: string, password: string) => {
     try {
@@ -72,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      // Marcar como offline antes de cerrar sesión
+      await fetch('/api/auth/presence', { method: 'DELETE' });
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
       router.push(ROUTES.LOGIN);

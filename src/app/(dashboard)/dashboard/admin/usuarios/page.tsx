@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw, Circle, Package, Store, FileText } from 'lucide-react';
 import { useAuth, useTableSubscription } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types';
@@ -76,8 +76,9 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Realtime centralizado para usuarios
+  // Realtime centralizado para usuarios y presencia
   const isConnected = useTableSubscription('users', fetchUsers);
+  useTableSubscription('user_presence', fetchUsers);
 
   // Filtrar usuarios con useMemo
   const filteredUsers = useMemo(() => {
@@ -168,6 +169,37 @@ export default function UsersPage() {
     );
   };
 
+  const getOnlineIndicator = (isOnline: boolean) => {
+    return (
+      <Circle 
+        className={`h-2.5 w-2.5 ${isOnline ? 'fill-green-500 text-green-500' : 'fill-gray-300 text-gray-300'}`} 
+      />
+    );
+  };
+
+  const getPermissionsBadges = (permissions?: { inventario?: boolean; tiendas?: boolean; cotizaciones?: boolean }) => {
+    if (!permissions) return null;
+    return (
+      <div className="flex gap-1">
+        {permissions.inventario && (
+          <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
+            <Package className="h-3 w-3" />
+          </Badge>
+        )}
+        {permissions.tiendas && (
+          <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
+            <Store className="h-3 w-3" />
+          </Badge>
+        )}
+        {permissions.cotizaciones && (
+          <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
+            <FileText className="h-3 w-3" />
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
   if (currentUser?.role !== USER_ROLES.ADMIN) {
     return null;
   }
@@ -231,6 +263,9 @@ export default function UsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
+                    <th className="text-left py-3 px-2 font-medium text-muted-foreground w-8">
+                      
+                    </th>
                     <th className="text-left py-3 px-2 font-medium text-muted-foreground">
                       Usuario
                     </th>
@@ -239,6 +274,9 @@ export default function UsersPage() {
                     </th>
                     <th className="text-left py-3 px-2 font-medium text-muted-foreground">
                       Rol
+                    </th>
+                    <th className="text-left py-3 px-2 font-medium text-muted-foreground hidden md:table-cell">
+                      Permisos
                     </th>
                     <th className="text-left py-3 px-2 font-medium text-muted-foreground hidden md:table-cell">
                       Estado
@@ -255,6 +293,9 @@ export default function UsersPage() {
                   {filteredUsers.map((user) => (
                     <tr key={user.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="py-3 px-2">
+                        {getOnlineIndicator(user.isOnline || false)}
+                      </td>
+                      <td className="py-3 px-2">
                         <div className="flex flex-col">
                           <span className="font-medium">{user.username}</span>
                           <span className="text-sm text-muted-foreground sm:hidden">
@@ -266,6 +307,9 @@ export default function UsersPage() {
                         {user.fullName}
                       </td>
                       <td className="py-3 px-2">{getRoleBadge(user.role)}</td>
+                      <td className="py-3 px-2 hidden md:table-cell">
+                        {getPermissionsBadges(user.permissions)}
+                      </td>
                       <td className="py-3 px-2 hidden md:table-cell">
                         {getStatusBadge(user.isActive)}
                       </td>
