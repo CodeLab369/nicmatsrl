@@ -95,6 +95,7 @@ export default function DashboardPage() {
       icon: Package,
       color: 'text-blue-500 bg-blue-500/15 dark:bg-blue-500/20',
       href: '/dashboard/inventario',
+      permission: 'inventario' as const,
     },
     {
       title: 'Cotizaciones',
@@ -103,6 +104,7 @@ export default function DashboardPage() {
       icon: FileText,
       color: 'text-green-500 bg-green-500/15 dark:bg-green-500/20',
       href: '/dashboard/cotizaciones',
+      permission: 'cotizaciones' as const,
     },
     {
       title: 'Usuarios',
@@ -111,6 +113,7 @@ export default function DashboardPage() {
       icon: Users,
       color: 'text-purple-500 bg-purple-500/15 dark:bg-purple-500/20',
       href: '/dashboard/admin/usuarios',
+      adminOnly: true,
     },
     {
       title: 'Valor Inventario',
@@ -119,8 +122,20 @@ export default function DashboardPage() {
       icon: TrendingUp,
       color: 'text-amber-500 bg-amber-500/15 dark:bg-amber-500/20',
       href: '/dashboard/inventario',
+      permission: 'inventario' as const,
     },
   ];
+
+  // Filtrar stats según permisos
+  const filteredStatsCards = statsCards.filter(stat => {
+    if (stat.adminOnly) {
+      return user?.role === 'admin';
+    }
+    if (stat.permission && user?.permissions) {
+      return user.permissions[stat.permission] === true;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -136,7 +151,7 @@ export default function DashboardPage() {
 
       {/* Estadísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCards.map((stat) => {
+        {filteredStatsCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <Link key={stat.title} href={stat.href}>
@@ -176,36 +191,51 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <Link href="/dashboard/inventario">
-                <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
-                  <Package className="h-8 w-8 text-primary mb-2" />
-                  <span className="text-sm font-medium">Inventario</span>
-                  <span className="text-xs text-muted-foreground">{stats.productos} productos</span>
-                </div>
-              </Link>
-              <Link href="/dashboard/cotizaciones">
-                <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-colors cursor-pointer">
-                  <FileText className="h-8 w-8 text-green-500 mb-2" />
-                  <span className="text-sm font-medium">Cotizaciones</span>
-                  <span className="text-xs text-muted-foreground">{stats.cotizacionesTotal} totales</span>
-                </div>
-              </Link>
+              {user?.permissions?.inventario && (
+                <Link href="/dashboard/inventario">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+                    <Package className="h-8 w-8 text-primary mb-2" />
+                    <span className="text-sm font-medium">Inventario</span>
+                    <span className="text-xs text-muted-foreground">{stats.productos} productos</span>
+                  </div>
+                </Link>
+              )}
+              {user?.permissions?.cotizaciones && (
+                <Link href="/dashboard/cotizaciones">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-colors cursor-pointer">
+                    <FileText className="h-8 w-8 text-green-500 mb-2" />
+                    <span className="text-sm font-medium">Cotizaciones</span>
+                    <span className="text-xs text-muted-foreground">{stats.cotizacionesTotal} totales</span>
+                  </div>
+                </Link>
+              )}
+              {user?.permissions?.tiendas && (
+                <Link href="/dashboard/tiendas">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer">
+                    <ShoppingCart className="h-8 w-8 text-amber-500 mb-2" />
+                    <span className="text-sm font-medium">Tiendas</span>
+                    <span className="text-xs text-muted-foreground">Gestionar tiendas</span>
+                  </div>
+                </Link>
+              )}
             </div>
             
-            {/* Resumen de cotizaciones */}
-            <div className="mt-4 pt-4 border-t">
-              <h4 className="text-sm font-medium mb-3">Estado de Cotizaciones</h4>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-500" />
-                  <span className="text-sm">{stats.cotizacionesPendientes} Pendientes</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">{stats.cotizacionesAceptadas} Aceptadas</span>
+            {/* Resumen de cotizaciones - solo si tiene permiso */}
+            {user?.permissions?.cotizaciones && (
+              <div className="mt-4 pt-4 border-t">
+                <h4 className="text-sm font-medium mb-3">Estado de Cotizaciones</h4>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm">{stats.cotizacionesPendientes} Pendientes</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">{stats.cotizacionesAceptadas} Aceptadas</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
