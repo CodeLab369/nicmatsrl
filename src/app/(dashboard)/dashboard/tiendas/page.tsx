@@ -883,11 +883,11 @@ export default function TiendasPage() {
                           <Badge variant="secondary">{item.cantidad}</Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar - 1)}
                               disabled={!item.selected || item.cantidadEnviar <= 0}
                             >
@@ -895,7 +895,7 @@ export default function TiendasPage() {
                             </Button>
                             <Input
                               type="number"
-                              className="w-20 text-center h-8"
+                              className="w-16 text-center h-7 px-1"
                               value={item.cantidadEnviar}
                               onChange={(e) => handleTransferItemChange(item.id, 'cantidadEnviar', parseInt(e.target.value) || 0)}
                               disabled={!item.selected}
@@ -905,7 +905,7 @@ export default function TiendasPage() {
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-7 w-7"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar + 1)}
                               disabled={!item.selected || item.cantidadEnviar >= item.cantidad}
                             >
@@ -914,7 +914,7 @@ export default function TiendasPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-xs"
+                              className="text-xs h-7 px-2"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidad)}
                               disabled={!item.selected}
                             >
