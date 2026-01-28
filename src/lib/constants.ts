@@ -47,11 +47,14 @@ export const ROUTES = {
   ADMIN_USERS: '/dashboard/admin/usuarios',
   ADMIN_PROFILE: '/dashboard/admin/perfil',
   
-  // Inventario (futuro)
+  // Inventario
   INVENTORY: '/dashboard/inventario',
   
-  // Cotizaciones (futuro)
+  // Cotizaciones
   QUOTATIONS: '/dashboard/cotizaciones',
+  
+  // Tiendas
+  STORES: '/dashboard/tiendas',
 } as const;
 
 // Mensajes de error comunes

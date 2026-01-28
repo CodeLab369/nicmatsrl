@@ -10,6 +10,7 @@ import {
   Settings,
   Users,
   UserCog,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts';
@@ -51,6 +52,11 @@ const navigation: NavGroup[] = [
         title: 'Inventario',
         href: ROUTES.INVENTORY,
         icon: Package,
+      },
+      {
+        title: 'Tiendas',
+        href: ROUTES.STORES,
+        icon: Store,
       },
       {
         title: 'Cotizaciones',

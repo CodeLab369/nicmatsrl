@@ -13,3 +13,4 @@ export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './alert-dialog';
 export { Badge } from './badge';
 export { LoadingSpinner, PageLoader, TableSkeleton, CardSkeleton } from './loading';
+export { Checkbox } from './checkbox';
