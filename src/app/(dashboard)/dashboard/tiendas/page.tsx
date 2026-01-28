@@ -812,13 +812,13 @@ export default function TiendasPage() {
                     <p className="text-xs text-muted-foreground">Unidades</p>
                     <p className="text-base sm:text-lg font-bold">{tiendaStats.totalUnidades}</p>
                   </div>
-                  <div className="bg-muted p-2 sm:p-3 rounded-lg text-center">
+                  <div className="bg-muted p-2 sm:p-3 rounded-lg text-center min-w-0">
                     <p className="text-xs text-muted-foreground">Valor Costo</p>
-                    <p className="text-sm sm:text-lg font-bold">{formatCurrency(tiendaStats.valorCosto)}</p>
+                    <p className="text-xs sm:text-sm lg:text-base font-bold truncate">{formatCurrency(tiendaStats.valorCosto)}</p>
                   </div>
-                  <div className="bg-primary/10 p-2 sm:p-3 rounded-lg text-center">
+                  <div className="bg-primary/10 p-2 sm:p-3 rounded-lg text-center min-w-0">
                     <p className="text-xs text-muted-foreground">Valor Venta</p>
-                    <p className="text-sm sm:text-lg font-bold text-primary">{formatCurrency(tiendaStats.valorVenta)}</p>
+                    <p className="text-xs sm:text-sm lg:text-base font-bold text-primary truncate">{formatCurrency(tiendaStats.valorVenta)}</p>
                   </div>
                 </div>
 
