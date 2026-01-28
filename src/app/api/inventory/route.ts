@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const getMarcas = searchParams.get('getMarcas') === 'true';
     const getAmperajes = searchParams.get('getAmperajes') === 'true';
     const searchExact = searchParams.get('searchExact') === 'true';
+    const minStock = searchParams.get('minStock');
 
     // Buscar producto exacto por marca y amperaje (para detección de existentes)
     if (searchExact && marca && amperaje) {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Función para aplicar filtros a una query
-    const applyFilters = (query: any) => {
+    const applyFilters = (query: any, includeMinStock = false) => {
       if (search) {
         query = query.or(`marca.ilike.%${search}%,amperaje.ilike.%${search}%`);
       }
@@ -77,54 +78,49 @@ export async function GET(request: NextRequest) {
           case 'lte': query = query.lte('cantidad', val); break;
         }
       }
+      // Filtro de stock mínimo (para transferencias)
+      if (includeMinStock && minStock) {
+        query = query.gte('cantidad', parseInt(minStock));
+      }
       return query;
     };
 
     let query = supabase
       .from('inventory')
-      .select('*', { count: 'exact' });
+      .select('id, marca, amperaje, cantidad, costo, precio_venta, created_at', { count: 'exact' });
 
-    query = applyFilters(query);
+    query = applyFilters(query, true);
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // Ejecutar queries en paralelo para máxima velocidad
+    const [mainResult, statsResult, globalStatsResult] = await Promise.all([
+      query.order('created_at', { ascending: false }).range(offset, offset + limit - 1),
+      applyFilters(supabase.from('inventory').select('cantidad, costo, precio_venta'), false),
+      supabase.from('inventory').select('cantidad, costo, precio_venta')
+    ]);
 
-    if (error) throw error;
+    if (mainResult.error) throw mainResult.error;
 
-    // Obtener estadísticas CON los mismos filtros aplicados
-    let statsQuery = supabase
-      .from('inventory')
-      .select('cantidad, costo, precio_venta');
-    
-    statsQuery = applyFilters(statsQuery);
-    const { data: statsData } = await statsQuery;
-
+    const statsData = statsResult.data || [];
     const stats = {
-      productos: statsData?.length || 0,
-      unidadesTotales: statsData?.reduce((acc, item) => acc + (item.cantidad || 0), 0) || 0,
-      costoTotal: statsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0) || 0,
-      valorVenta: statsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0) || 0,
+      productos: statsData.length,
+      unidadesTotales: statsData.reduce((acc, item) => acc + (item.cantidad || 0), 0),
+      costoTotal: statsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0),
+      valorVenta: statsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0),
     };
 
-    // Obtener totales globales (sin filtros) para el Dashboard
-    const { data: globalStatsData } = await supabase
-      .from('inventory')
-      .select('cantidad, costo, precio_venta');
-    
-    const totalProducts = globalStatsData?.length || 0;
-    const totalUnits = globalStatsData?.reduce((acc, item) => acc + (item.cantidad || 0), 0) || 0;
-    const totalCost = globalStatsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0) || 0;
-    const totalSaleValue = globalStatsData?.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0) || 0;
+    const globalStatsData = globalStatsResult.data || [];
+    const totalProducts = globalStatsData.length;
+    const totalUnits = globalStatsData.reduce((acc, item) => acc + (item.cantidad || 0), 0);
+    const totalCost = globalStatsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.costo || 0)), 0);
+    const totalSaleValue = globalStatsData.reduce((acc, item) => acc + ((item.cantidad || 0) * (item.precio_venta || 0)), 0);
 
     return NextResponse.json({
-      items: data || [],
-      total: count || 0,
+      items: mainResult.data || [],
+      total: mainResult.count || 0,
       page,
       limit,
-      totalPages: Math.ceil((count || 0) / limit),
+      totalPages: Math.ceil((mainResult.count || 0) / limit),
       stats,
-      // Estadísticas globales para el Dashboard
       totalProducts,
       totalUnits,
       totalCost,

@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
+    // Query principal con filtros
     let query = supabase
       .from('tienda_inventario')
-      .select('*', { count: 'exact' })
+      .select('id, marca, amperaje, cantidad, costo, precio_venta', { count: 'exact' })
       .eq('tienda_id', tiendaId);
 
     if (marca && marca !== '_all') {
@@ -34,21 +35,21 @@ export async function GET(request: NextRequest) {
       query = query.eq('amperaje', amperaje);
     }
 
-    const { data, error, count } = await query
-      .order('marca', { ascending: true })
-      .order('amperaje', { ascending: true })
-      .range(offset, offset + limit - 1);
+    // Ejecutar ambas queries en paralelo
+    const [mainResult, allItemsResult] = await Promise.all([
+      query.order('marca').order('amperaje').range(offset, offset + limit - 1),
+      supabase
+        .from('tienda_inventario')
+        .select('marca, amperaje, cantidad, costo, precio_venta')
+        .eq('tienda_id', tiendaId)
+    ]);
 
-    if (error) throw error;
+    if (mainResult.error) throw mainResult.error;
 
-    // Obtener TODOS los items de la tienda para marcas (sin filtros)
-    const { data: allItems } = await supabase
-      .from('tienda_inventario')
-      .select('marca, amperaje, cantidad, costo, precio_venta')
-      .eq('tienda_id', tiendaId);
+    const allItems = allItemsResult.data || [];
 
     // Filtrar items para stats según filtros aplicados
-    let filteredItems = allItems || [];
+    let filteredItems = allItems;
     if (marca && marca !== '_all') {
       filteredItems = filteredItems.filter(i => i.marca === marca);
     }
@@ -64,22 +65,22 @@ export async function GET(request: NextRequest) {
       valorVenta: filteredItems.reduce((sum, i) => sum + ((i.cantidad || 0) * (i.precio_venta || 0)), 0),
     };
 
-    // Obtener marcas únicas de la tienda (siempre sin filtrar para mostrar todas)
-    const marcas = Array.from(new Set(allItems?.map(i => i.marca) || [])).filter(Boolean).sort();
+    // Marcas únicas (sin filtrar)
+    const marcas = Array.from(new Set(allItems.map(i => i.marca))).filter(Boolean).sort();
     
-    // Obtener amperajes filtrados por marca seleccionada
+    // Amperajes filtrados por marca
     let amperajes: string[] = [];
     if (marca && marca !== '_all') {
-      amperajes = Array.from(new Set(allItems?.filter(i => i.marca === marca).map(i => i.amperaje) || [])).filter(Boolean).sort() as string[];
+      amperajes = Array.from(new Set(allItems.filter(i => i.marca === marca).map(i => i.amperaje))).filter(Boolean).sort() as string[];
     } else {
-      amperajes = Array.from(new Set(allItems?.map(i => i.amperaje) || [])).filter(Boolean).sort() as string[];
+      amperajes = Array.from(new Set(allItems.map(i => i.amperaje))).filter(Boolean).sort() as string[];
     }
 
     return NextResponse.json({
-      items: data || [],
-      total: count || 0,
+      items: mainResult.data || [],
+      total: mainResult.count || 0,
       page,
-      totalPages: Math.ceil((count || 0) / limit),
+      totalPages: Math.ceil((mainResult.count || 0) / limit),
       stats,
       marcas,
       amperajes

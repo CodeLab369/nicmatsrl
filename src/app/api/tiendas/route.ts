@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (getAll) {
       const { data, error } = await supabase
         .from('tiendas')
-        .select('*')
+        .select('id, nombre, tipo')
         .order('nombre', { ascending: true });
 
       if (error) throw error;
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
+    // Query principal
     let query = supabase
       .from('tiendas')
       .select('*', { count: 'exact' });
@@ -55,28 +56,29 @@ export async function GET(request: NextRequest) {
       query = query.eq('ciudad', ciudad);
     }
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // Ejecutar ambas queries en paralelo
+    const [mainResult, statsResult] = await Promise.all([
+      query.order('created_at', { ascending: false }).range(offset, offset + limit - 1),
+      supabase.from('tiendas').select('tipo, ciudad')
+    ]);
 
-    if (error) throw error;
+    if (mainResult.error) throw mainResult.error;
 
-    // Estadísticas
-    const { data: allTiendas } = await supabase.from('tiendas').select('tipo, ciudad');
+    const allTiendas = statsResult.data || [];
     const stats = {
-      total: allTiendas?.length || 0,
-      casaMatriz: allTiendas?.filter(t => t.tipo === 'casa_matriz').length || 0,
-      sucursales: allTiendas?.filter(t => t.tipo === 'sucursal').length || 0,
+      total: allTiendas.length,
+      casaMatriz: allTiendas.filter(t => t.tipo === 'casa_matriz').length,
+      sucursales: allTiendas.filter(t => t.tipo === 'sucursal').length,
     };
 
     // Ciudades únicas para el filtro
-    const ciudades = Array.from(new Set(allTiendas?.map(t => t.ciudad).filter(Boolean))).sort() as string[];
+    const ciudades = Array.from(new Set(allTiendas.map(t => t.ciudad).filter(Boolean))).sort() as string[];
 
     return NextResponse.json({
-      tiendas: data || [],
-      total: count || 0,
+      tiendas: mainResult.data || [],
+      total: mainResult.count || 0,
       page,
-      totalPages: Math.ceil((count || 0) / limit),
+      totalPages: Math.ceil((mainResult.count || 0) / limit),
       stats,
       ciudades
     });

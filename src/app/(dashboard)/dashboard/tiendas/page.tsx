@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useTransition } from 'react';
 import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
   Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
@@ -184,11 +183,12 @@ export default function TiendasPage() {
     }
   }, [selectedTienda, tiendaPage, tiendaLimit, tiendaFilterMarca, tiendaFilterAmperaje]);
 
-  // Fetch inventario central para transferencia
+  // Fetch inventario central para transferencia (optimizado: solo campos necesarios)
   const fetchInventarioCentral = useCallback(async () => {
     try {
       setLoadingTransfer(true);
-      const response = await fetch('/api/inventory?limit=1000');
+      // Solo obtener items con stock disponible y campos necesarios
+      const response = await fetch('/api/inventory?limit=2000&fields=id,marca,amperaje,cantidad,costo,precio_venta&minStock=1');
       const data = await response.json();
       
       const items = (data.items || []).filter((i: InventoryItem) => i.cantidad > 0);
@@ -370,11 +370,14 @@ export default function TiendasPage() {
     }
   };
 
-  // Exportar inventario de tienda a Excel
+  // Exportar inventario de tienda a Excel (lazy load XLSX)
   const handleExportTiendaInventory = async () => {
     if (!selectedTienda) return;
 
     try {
+      // Importar XLSX dinámicamente solo cuando se necesita
+      const XLSX = await import('xlsx');
+      
       // Obtener TODOS los items de la tienda (sin paginación)
       const response = await fetch(`/api/tienda-inventario?tiendaId=${selectedTienda.id}&limit=10000`);
       const data = await response.json();
