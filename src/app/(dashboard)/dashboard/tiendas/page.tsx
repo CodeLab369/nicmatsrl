@@ -786,9 +786,9 @@ export default function TiendasPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-hidden flex flex-col pt-2">
             {/* Filtros */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-4 mt-1">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -883,11 +883,11 @@ export default function TiendasPage() {
                           <Badge variant="secondary">{item.cantidad}</Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="inline-flex items-center border rounded-md overflow-hidden">
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-7 w-7"
+                              className="h-7 w-7 rounded-none border-r"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar - 1)}
                               disabled={!item.selected || item.cantidadEnviar <= 0}
                             >
@@ -895,7 +895,7 @@ export default function TiendasPage() {
                             </Button>
                             <Input
                               type="number"
-                              className="w-16 text-center h-7 px-1"
+                              className="w-14 text-center h-7 px-1 border-0 rounded-none focus-visible:ring-0"
                               value={item.cantidadEnviar}
                               onChange={(e) => handleTransferItemChange(item.id, 'cantidadEnviar', parseInt(e.target.value) || 0)}
                               disabled={!item.selected}
@@ -903,9 +903,9 @@ export default function TiendasPage() {
                               max={item.cantidad}
                             />
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-7 w-7"
+                              className="h-7 w-7 rounded-none border-l"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar + 1)}
                               disabled={!item.selected || item.cantidadEnviar >= item.cantidad}
                             >
@@ -914,7 +914,7 @@ export default function TiendasPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-xs h-7 px-2"
+                              className="text-xs h-7 px-2 rounded-none border-l"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidad)}
                               disabled={!item.selected}
                             >
