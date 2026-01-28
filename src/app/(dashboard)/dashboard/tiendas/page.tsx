@@ -882,20 +882,20 @@ export default function TiendasPage() {
                         <td className="py-3 px-4 text-center">
                           <Badge variant="secondary">{item.cantidad}</Badge>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4 text-center">
                           <div className="inline-flex items-center border rounded-md overflow-hidden">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 rounded-none border-r"
+                              className="h-7 w-7 rounded-none"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar - 1)}
                               disabled={!item.selected || item.cantidadEnviar <= 0}
                             >
                               -
                             </Button>
-                            <Input
+                            <input
                               type="number"
-                              className="w-14 text-center h-7 px-1 border-0 rounded-none focus-visible:ring-0"
+                              className="w-12 text-center h-7 border-x bg-transparent text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               value={item.cantidadEnviar}
                               onChange={(e) => handleTransferItemChange(item.id, 'cantidadEnviar', parseInt(e.target.value) || 0)}
                               disabled={!item.selected}
@@ -905,7 +905,7 @@ export default function TiendasPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 rounded-none border-l"
+                              className="h-7 w-7 rounded-none"
                               onClick={() => handleTransferItemChange(item.id, 'cantidadEnviar', item.cantidadEnviar + 1)}
                               disabled={!item.selected || item.cantidadEnviar >= item.cantidad}
                             >
