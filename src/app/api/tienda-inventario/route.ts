@@ -41,20 +41,30 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Estadísticas de la tienda (incluir marca y amperaje para filtrar)
+    // Obtener TODOS los items de la tienda para marcas (sin filtros)
     const { data: allItems } = await supabase
       .from('tienda_inventario')
       .select('marca, amperaje, cantidad, costo, precio_venta')
       .eq('tienda_id', tiendaId);
 
+    // Filtrar items para stats según filtros aplicados
+    let filteredItems = allItems || [];
+    if (marca && marca !== '_all') {
+      filteredItems = filteredItems.filter(i => i.marca === marca);
+    }
+    if (amperaje && amperaje !== '_all') {
+      filteredItems = filteredItems.filter(i => i.amperaje === amperaje);
+    }
+
+    // Stats basados en items filtrados
     const stats = {
-      totalProductos: allItems?.length || 0,
-      totalUnidades: allItems?.reduce((sum, i) => sum + (i.cantidad || 0), 0) || 0,
-      valorCosto: allItems?.reduce((sum, i) => sum + ((i.cantidad || 0) * (i.costo || 0)), 0) || 0,
-      valorVenta: allItems?.reduce((sum, i) => sum + ((i.cantidad || 0) * (i.precio_venta || 0)), 0) || 0,
+      totalProductos: filteredItems.length,
+      totalUnidades: filteredItems.reduce((sum, i) => sum + (i.cantidad || 0), 0),
+      valorCosto: filteredItems.reduce((sum, i) => sum + ((i.cantidad || 0) * (i.costo || 0)), 0),
+      valorVenta: filteredItems.reduce((sum, i) => sum + ((i.cantidad || 0) * (i.precio_venta || 0)), 0),
     };
 
-    // Obtener marcas únicas de la tienda
+    // Obtener marcas únicas de la tienda (siempre sin filtrar para mostrar todas)
     const marcas = Array.from(new Set(allItems?.map(i => i.marca) || [])).filter(Boolean).sort();
     
     // Obtener amperajes filtrados por marca seleccionada
