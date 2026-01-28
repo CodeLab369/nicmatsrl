@@ -786,7 +786,7 @@ export default function TiendasPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col pt-2">
+          <div className="flex-1 overflow-hidden flex flex-col pt-2 px-1">
             {/* Filtros */}
             <div className="flex items-center gap-2 mb-4 mt-1">
               <div className="relative flex-1">
