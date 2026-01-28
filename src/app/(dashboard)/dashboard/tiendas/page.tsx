@@ -544,36 +544,36 @@ export default function TiendasPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card className="shadow-soft border-l-4 border-l-primary">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3">
-              <Store className="h-8 w-8 text-primary" />
+              <Store className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total Tiendas</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Tiendas</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-blue-500" />
+              <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.casaMatriz}</p>
-                <p className="text-sm text-muted-foreground">Casa Matriz</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.casaMatriz}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Casa Matriz</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-l-4 border-l-green-500">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3">
-              <Store className="h-8 w-8 text-green-500" />
+              <Store className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.sucursales}</p>
-                <p className="text-sm text-muted-foreground">Sucursales</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.sucursales}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Sucursales</p>
               </div>
             </div>
           </CardContent>

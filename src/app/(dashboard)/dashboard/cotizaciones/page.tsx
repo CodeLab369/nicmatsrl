@@ -1084,47 +1084,47 @@ export default function CotizacionesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card className="shadow-soft border-l-4 border-l-amber-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="h-8 w-8 text-amber-500" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.pendientes}</p>
-                <p className="text-sm text-muted-foreground">Pendientes</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.pendientes}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Pendientes</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-l-4 border-l-green-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-green-500" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.aceptadas}</p>
-                <p className="text-sm text-muted-foreground">Aceptadas</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.aceptadas}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Aceptadas</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <ShoppingCart className="h-8 w-8 text-blue-500" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.convertidas}</p>
-                <p className="text-sm text-muted-foreground">Convertidas</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.convertidas}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Convertidas</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-l-4 border-l-muted-foreground">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-muted-foreground" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
               <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
               </div>
             </div>
           </CardContent>
