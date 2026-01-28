@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Obtener usuario actualizado de la base de datos
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, full_name, role, is_active, last_login, created_at')
+      .select('id, username, full_name, role, is_active, last_login, created_at, permissions')
       .eq('id', payload.userId)
       .eq('is_active', true)
       .single();
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
         isActive: user.is_active,
         lastLogin: user.last_login,
         createdAt: user.created_at,
+        permissions: user.permissions || { inventario: true, tiendas: true, cotizaciones: true },
       },
     });
   } catch (error) {

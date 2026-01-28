@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       isActive: user.is_active,
       lastLogin: user.last_login,
       createdAt: user.created_at,
+      permissions: user.permissions || { inventario: true, tiendas: true, cotizaciones: true },
     };
 
     // Crear respuesta con cookie

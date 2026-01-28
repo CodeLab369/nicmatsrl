@@ -27,6 +27,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
+  permission?: 'inventario' | 'tiendas' | 'cotizaciones';
 }
 
 interface NavGroup {
@@ -52,16 +53,19 @@ const navigation: NavGroup[] = [
         title: 'Inventario',
         href: ROUTES.INVENTORY,
         icon: Package,
+        permission: 'inventario',
       },
       {
         title: 'Tiendas',
         href: ROUTES.STORES,
         icon: Store,
+        permission: 'tiendas',
       },
       {
         title: 'Cotizaciones',
         href: ROUTES.QUOTATIONS,
         icon: FileText,
+        permission: 'cotizaciones',
       },
     ],
   },
@@ -95,8 +99,18 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   };
 
   const hasAccess = (item: NavItem) => {
-    if (!item.roles) return true;
-    return user && item.roles.includes(user.role);
+    // Verificar rol
+    if (item.roles && (!user || !item.roles.includes(user.role))) {
+      return false;
+    }
+    
+    // Verificar permiso de módulo
+    if (item.permission && user?.permissions) {
+      return user.permissions[item.permission] === true;
+    }
+    
+    // Si no tiene restricción de permiso, permitir acceso
+    return true;
   };
 
   return (
