@@ -803,22 +803,22 @@ export default function TiendasPage() {
             ) : (
               <>
                 {/* Stats de la tienda */}
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                  <div className="bg-muted p-3 rounded-lg text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                  <div className="bg-muted p-2 sm:p-3 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">Productos</p>
-                    <p className="text-lg font-bold">{tiendaStats.totalProductos}</p>
+                    <p className="text-base sm:text-lg font-bold">{tiendaStats.totalProductos}</p>
                   </div>
-                  <div className="bg-muted p-3 rounded-lg text-center">
+                  <div className="bg-muted p-2 sm:p-3 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">Unidades</p>
-                    <p className="text-lg font-bold">{tiendaStats.totalUnidades}</p>
+                    <p className="text-base sm:text-lg font-bold">{tiendaStats.totalUnidades}</p>
                   </div>
-                  <div className="bg-muted p-3 rounded-lg text-center">
+                  <div className="bg-muted p-2 sm:p-3 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">Valor Costo</p>
-                    <p className="text-lg font-bold">{formatCurrency(tiendaStats.valorCosto)}</p>
+                    <p className="text-sm sm:text-lg font-bold">{formatCurrency(tiendaStats.valorCosto)}</p>
                   </div>
-                  <div className="bg-primary/10 p-3 rounded-lg text-center">
+                  <div className="bg-primary/10 p-2 sm:p-3 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">Valor Venta</p>
-                    <p className="text-lg font-bold text-primary">{formatCurrency(tiendaStats.valorVenta)}</p>
+                    <p className="text-sm sm:text-lg font-bold text-primary">{formatCurrency(tiendaStats.valorVenta)}</p>
                   </div>
                 </div>
 
