@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  // Suscripción Realtime para detectar cambios en el usuario actual (desactivación)
+  // Suscripción Realtime para detectar cambios en el usuario actual (desactivación y permisos)
   useEffect(() => {
     if (!user) return;
 
@@ -89,21 +89,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         async (payload) => {
           console.log('[Auth] Cambio detectado en usuario actual:', payload);
+          const newData = payload.new as Record<string, unknown>;
+          
           // Si el usuario fue desactivado, forzar logout inmediato
-          if (payload.new && payload.new.is_active === false) {
+          if (newData && newData.is_active === false) {
             console.log('[Auth] Usuario desactivado, forzando logout...');
             await fetch('/api/auth/logout', { method: 'POST' });
             setUser(null);
             router.push(ROUTES.LOGIN);
+            return;
+          }
+          
+          // Actualizar permisos y otros datos en tiempo real
+          if (newData) {
+            console.log('[Auth] Actualizando datos del usuario en tiempo real...');
+            setUser(prevUser => {
+              if (!prevUser) return null;
+              return {
+                ...prevUser,
+                permissions: (newData.permissions as User['permissions']) || prevUser.permissions,
+                role: (newData.role as string) || prevUser.role,
+                fullName: (newData.full_name as string) || prevUser.fullName,
+                username: (newData.username as string) || prevUser.username,
+              };
+            });
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Auth] Realtime subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, router]);
+  }, [user?.id, router]);
 
   // Iniciar heartbeat cuando hay usuario
   useEffect(() => {
