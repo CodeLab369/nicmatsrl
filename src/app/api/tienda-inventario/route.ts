@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Enviar productos a tienda (transferencia masiva desde inventario central)
+// POST - Enviar productos a tienda (transferencia masiva OPTIMIZADA)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -92,102 +92,111 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'tiendaId y productos son requeridos' }, { status: 400 });
     }
 
-    const resultados = {
-      exitosos: 0,
-      errores: [] as string[],
-    };
+    // 1. Obtener todos los inventarios centrales necesarios en UNA sola consulta
+    const inventoryIds = productos.map(p => p.inventoryId);
+    const { data: inventoryItems } = await supabase
+      .from('inventory')
+      .select('*')
+      .in('id', inventoryIds);
+
+    const inventoryMap = new Map(inventoryItems?.map(i => [i.id, i]) || []);
+
+    // 2. Obtener todos los items existentes en la tienda en UNA sola consulta
+    const { data: existingTiendaItems } = await supabase
+      .from('tienda_inventario')
+      .select('*')
+      .eq('tienda_id', tiendaId);
+
+    const tiendaMap = new Map(
+      existingTiendaItems?.map(i => [`${i.marca}-${i.amperaje}`, i]) || []
+    );
+
+    // 3. Preparar operaciones en batch
+    const inventoryUpdates: { id: string; cantidad: number }[] = [];
+    const tiendaInserts: any[] = [];
+    const tiendaUpdates: { id: string; cantidad: number; costo: number; precio_venta: number }[] = [];
+    const errores: string[] = [];
+    let exitosos = 0;
 
     for (const producto of productos) {
-      try {
-        // 1. Verificar stock en inventario central
-        const { data: inventoryItem } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('id', producto.inventoryId)
-          .single();
-
-        if (!inventoryItem || inventoryItem.cantidad < producto.cantidad) {
-          resultados.errores.push(`${producto.marca} ${producto.amperaje}: Stock insuficiente`);
-          continue;
-        }
-
-        // 2. Restar del inventario central
-        const { error: updateError } = await supabase
-          .from('inventory')
-          .update({ 
-            cantidad: inventoryItem.cantidad - producto.cantidad,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', producto.inventoryId);
-
-        if (updateError) {
-          resultados.errores.push(`${producto.marca} ${producto.amperaje}: Error al actualizar inventario central`);
-          continue;
-        }
-
-        // 3. Verificar si ya existe en la tienda
-        const { data: existingItem } = await supabase
-          .from('tienda_inventario')
-          .select('*')
-          .eq('tienda_id', tiendaId)
-          .eq('marca', producto.marca)
-          .eq('amperaje', producto.amperaje)
-          .single();
-
-        if (existingItem) {
-          // Sumar cantidad existente
-          const { error: tiendaUpdateError } = await supabase
-            .from('tienda_inventario')
-            .update({
-              cantidad: existingItem.cantidad + producto.cantidad,
-              costo: producto.costo || existingItem.costo,
-              precio_venta: producto.precio_venta || existingItem.precio_venta,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingItem.id);
-
-          if (tiendaUpdateError) {
-            // Revertir el cambio en inventario central
-            await supabase
-              .from('inventory')
-              .update({ cantidad: inventoryItem.cantidad })
-              .eq('id', producto.inventoryId);
-            resultados.errores.push(`${producto.marca} ${producto.amperaje}: Error al actualizar tienda`);
-            continue;
-          }
-        } else {
-          // Crear nuevo registro en tienda
-          const { error: insertError } = await supabase
-            .from('tienda_inventario')
-            .insert({
-              tienda_id: tiendaId,
-              marca: producto.marca,
-              amperaje: producto.amperaje,
-              cantidad: producto.cantidad,
-              costo: producto.costo || inventoryItem.costo,
-              precio_venta: producto.precio_venta || inventoryItem.precio_venta,
-            });
-
-          if (insertError) {
-            // Revertir el cambio en inventario central
-            await supabase
-              .from('inventory')
-              .update({ cantidad: inventoryItem.cantidad })
-              .eq('id', producto.inventoryId);
-            resultados.errores.push(`${producto.marca} ${producto.amperaje}: Error al crear en tienda`);
-            continue;
-          }
-        }
-
-        resultados.exitosos++;
-      } catch (err) {
-        resultados.errores.push(`${producto.marca} ${producto.amperaje}: Error inesperado`);
+      const inventoryItem = inventoryMap.get(producto.inventoryId);
+      
+      if (!inventoryItem || inventoryItem.cantidad < producto.cantidad) {
+        errores.push(`${producto.marca} ${producto.amperaje}: Stock insuficiente`);
+        continue;
       }
+
+      // Preparar actualización de inventario central
+      inventoryUpdates.push({
+        id: producto.inventoryId,
+        cantidad: inventoryItem.cantidad - producto.cantidad
+      });
+
+      // Verificar si existe en tienda
+      const key = `${producto.marca}-${producto.amperaje}`;
+      const existingItem = tiendaMap.get(key);
+
+      if (existingItem) {
+        tiendaUpdates.push({
+          id: existingItem.id,
+          cantidad: existingItem.cantidad + producto.cantidad,
+          costo: producto.costo || existingItem.costo,
+          precio_venta: producto.precio_venta || existingItem.precio_venta
+        });
+        // Actualizar el map para manejar duplicados en la misma transferencia
+        tiendaMap.set(key, { ...existingItem, cantidad: existingItem.cantidad + producto.cantidad });
+      } else {
+        tiendaInserts.push({
+          tienda_id: tiendaId,
+          marca: producto.marca,
+          amperaje: producto.amperaje,
+          cantidad: producto.cantidad,
+          costo: producto.costo || inventoryItem.costo,
+          precio_venta: producto.precio_venta || inventoryItem.precio_venta,
+        });
+        // Agregar al map para manejar duplicados
+        tiendaMap.set(key, { marca: producto.marca, amperaje: producto.amperaje, cantidad: producto.cantidad });
+      }
+      
+      exitosos++;
     }
 
+    // 4. Ejecutar todas las operaciones en paralelo
+    const operations = [];
+
+    // Actualizar inventario central (todas las updates en paralelo)
+    if (inventoryUpdates.length > 0) {
+      operations.push(
+        Promise.all(inventoryUpdates.map(u => 
+          supabase.from('inventory').update({ cantidad: u.cantidad, updated_at: new Date().toISOString() }).eq('id', u.id)
+        ))
+      );
+    }
+
+    // Insertar nuevos items en tienda (batch insert)
+    if (tiendaInserts.length > 0) {
+      operations.push(supabase.from('tienda_inventario').insert(tiendaInserts));
+    }
+
+    // Actualizar items existentes en tienda (todas las updates en paralelo)
+    if (tiendaUpdates.length > 0) {
+      operations.push(
+        Promise.all(tiendaUpdates.map(u => 
+          supabase.from('tienda_inventario').update({ 
+            cantidad: u.cantidad, 
+            costo: u.costo, 
+            precio_venta: u.precio_venta,
+            updated_at: new Date().toISOString() 
+          }).eq('id', u.id)
+        ))
+      );
+    }
+
+    await Promise.all(operations);
+
     return NextResponse.json({
-      message: `Transferencia completada: ${resultados.exitosos} productos enviados`,
-      resultados
+      message: `Transferencia completada: ${exitosos} productos enviados`,
+      resultados: { exitosos, errores }
     });
 
   } catch (error) {
@@ -238,15 +247,15 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE - Eliminar producto de tienda (devolver a inventario central)
+// DELETE - Eliminar producto de tienda (devolver a inventario central) OPTIMIZADO
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const { tiendaId, returnAll, id, returnToInventory } = body;
 
-    // Devolver TODO el inventario de una tienda
+    // Devolver TODO el inventario de una tienda (OPTIMIZADO)
     if (returnAll && tiendaId) {
-      // Obtener todos los items de la tienda
+      // 1. Obtener todos los items de la tienda en UNA consulta
       const { data: tiendaItems, error: fetchError } = await supabase
         .from('tienda_inventario')
         .select('*')
@@ -258,57 +267,84 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ message: 'No hay inventario para devolver' });
       }
 
-      let devueltos = 0;
-      const errores: string[] = [];
+      // 2. Obtener todos los items del inventario central en UNA consulta
+      const { data: inventoryItems } = await supabase
+        .from('inventory')
+        .select('*');
+
+      const inventoryMap = new Map(
+        inventoryItems?.map(i => [`${i.marca}-${i.amperaje}`, i]) || []
+      );
+
+      // 3. Preparar operaciones en batch
+      const inventoryUpdates: { id: string; cantidad: number }[] = [];
+      const inventoryInserts: any[] = [];
 
       for (const item of tiendaItems) {
-        try {
-          // Buscar si existe en inventario central
-          const { data: inventoryItem } = await supabase
-            .from('inventory')
-            .select('*')
-            .eq('marca', item.marca)
-            .eq('amperaje', item.amperaje)
-            .single();
+        const key = `${item.marca}-${item.amperaje}`;
+        const existingInventory = inventoryMap.get(key);
 
-          if (inventoryItem) {
-            // Sumar al existente
-            await supabase
-              .from('inventory')
-              .update({
-                cantidad: inventoryItem.cantidad + item.cantidad,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', inventoryItem.id);
+        if (existingInventory) {
+          // Acumular cantidad si hay duplicados
+          const existing = inventoryUpdates.find(u => u.id === existingInventory.id);
+          if (existing) {
+            existing.cantidad += item.cantidad;
           } else {
-            // Crear nuevo en inventario central
-            await supabase
-              .from('inventory')
-              .insert({
-                marca: item.marca,
-                amperaje: item.amperaje,
-                cantidad: item.cantidad,
-                costo: item.costo,
-                precio_venta: item.precio_venta,
-              });
+            inventoryUpdates.push({
+              id: existingInventory.id,
+              cantidad: existingInventory.cantidad + item.cantidad
+            });
           }
-
-          devueltos++;
-        } catch (err) {
-          errores.push(`${item.marca} ${item.amperaje}`);
+        } else {
+          // Verificar si ya está en inserts
+          const existingInsert = inventoryInserts.find(
+            i => i.marca === item.marca && i.amperaje === item.amperaje
+          );
+          if (existingInsert) {
+            existingInsert.cantidad += item.cantidad;
+          } else {
+            inventoryInserts.push({
+              marca: item.marca,
+              amperaje: item.amperaje,
+              cantidad: item.cantidad,
+              costo: item.costo,
+              precio_venta: item.precio_venta,
+            });
+          }
         }
       }
 
-      // Eliminar todos los items de la tienda
-      await supabase
-        .from('tienda_inventario')
-        .delete()
-        .eq('tienda_id', tiendaId);
+      // 4. Ejecutar todas las operaciones en paralelo
+      const operations = [];
+
+      // Updates en paralelo
+      if (inventoryUpdates.length > 0) {
+        operations.push(
+          Promise.all(inventoryUpdates.map(u => 
+            supabase.from('inventory').update({ 
+              cantidad: u.cantidad, 
+              updated_at: new Date().toISOString() 
+            }).eq('id', u.id)
+          ))
+        );
+      }
+
+      // Batch insert
+      if (inventoryInserts.length > 0) {
+        operations.push(supabase.from('inventory').insert(inventoryInserts));
+      }
+
+      // Eliminar todo de la tienda en UNA operación
+      operations.push(
+        supabase.from('tienda_inventario').delete().eq('tienda_id', tiendaId)
+      );
+
+      await Promise.all(operations);
 
       return NextResponse.json({ 
-        message: `Se devolvieron ${devueltos} productos al inventario principal`,
-        devueltos,
-        errores
+        message: `Se devolvieron ${tiendaItems.length} productos al inventario principal`,
+        devueltos: tiendaItems.length,
+        errores: []
       });
     }
 
