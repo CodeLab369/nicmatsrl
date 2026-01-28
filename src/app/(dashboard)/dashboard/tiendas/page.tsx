@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
-  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2
+  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
@@ -369,6 +370,54 @@ export default function TiendasPage() {
     }
   };
 
+  // Exportar inventario de tienda a Excel
+  const handleExportTiendaInventory = async () => {
+    if (!selectedTienda) return;
+
+    try {
+      // Obtener TODOS los items de la tienda (sin paginación)
+      const response = await fetch(`/api/tienda-inventario?tiendaId=${selectedTienda.id}&limit=10000`);
+      const data = await response.json();
+      
+      if (!data.items || data.items.length === 0) {
+        toast({ title: 'Sin datos', description: 'No hay productos para exportar', variant: 'destructive' });
+        return;
+      }
+
+      // Preparar datos para Excel
+      const excelData = data.items.map((item: TiendaInventoryItem) => ({
+        'Marca': item.marca,
+        'Amperaje': item.amperaje,
+        'Cantidad': item.cantidad,
+        'Precio de Venta': item.precio_venta
+      }));
+
+      // Crear workbook y worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Ajustar anchos de columna
+      ws['!cols'] = [
+        { wch: 20 }, // Marca
+        { wch: 15 }, // Amperaje
+        { wch: 12 }, // Cantidad
+        { wch: 15 }, // Precio de Venta
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+
+      // Generar nombre de archivo
+      const fileName = `Inventario_${selectedTienda.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Descargar
+      XLSX.writeFile(wb, fileName);
+
+      toast({ title: 'Exportado', description: `Se exportaron ${data.items.length} productos`, variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Error al exportar', variant: 'destructive' });
+    }
+  };
+
   const handleTransferItemChange = (id: string, field: 'selected' | 'cantidadEnviar', value: boolean | number) => {
     setTransferItems(prev => prev.map(item => {
       if (item.id === id) {
@@ -720,6 +769,10 @@ export default function TiendasPage() {
               </div>
               {selectedTienda && (
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleExportTiendaInventory} className="gap-2" disabled={tiendaStats.totalProductos === 0}>
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </Button>
                   <Button variant="outline" onClick={() => setReturnDialogOpen(true)} className="gap-2" disabled={tiendaStats.totalUnidades === 0}>
                     <Undo2 className="h-4 w-4" />
                     Devolver Todo
