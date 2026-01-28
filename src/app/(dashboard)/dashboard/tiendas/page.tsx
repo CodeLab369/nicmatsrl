@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
@@ -384,17 +384,25 @@ export default function TiendasPage() {
     }
   };
 
-  // Filtrar items de transferencia
-  const filteredTransferItems = transferItems.filter(item => {
-    const matchSearch = !transferSearch || 
-      item.marca.toLowerCase().includes(transferSearch.toLowerCase()) ||
-      item.amperaje.toLowerCase().includes(transferSearch.toLowerCase());
-    const matchMarca = transferFilterMarca === '_all' || item.marca === transferFilterMarca;
-    return matchSearch && matchMarca;
-  });
+  // Filtrar items de transferencia con useMemo para evitar recálculos innecesarios
+  const filteredTransferItems = useMemo(() => {
+    return transferItems.filter(item => {
+      const searchLower = transferSearch.toLowerCase();
+      const matchSearch = !transferSearch || 
+        item.marca.toLowerCase().includes(searchLower) ||
+        item.amperaje.toLowerCase().includes(searchLower);
+      const matchMarca = transferFilterMarca === '_all' || item.marca === transferFilterMarca;
+      return matchSearch && matchMarca;
+    });
+  }, [transferItems, transferSearch, transferFilterMarca]);
 
-  const totalSeleccionados = transferItems.filter(i => i.selected && i.cantidadEnviar > 0).length;
-  const totalUnidadesAEnviar = transferItems.reduce((sum, i) => sum + (i.selected ? i.cantidadEnviar : 0), 0);
+  const totalSeleccionados = useMemo(() => 
+    transferItems.filter(i => i.selected && i.cantidadEnviar > 0).length
+  , [transferItems]);
+  
+  const totalUnidadesAEnviar = useMemo(() => 
+    transferItems.reduce((sum, i) => sum + (i.selected ? i.cantidadEnviar : 0), 0)
+  , [transferItems]);
 
   // Badge tipo tienda
   const getTipoBadge = (tipo: string) => {
@@ -827,6 +835,17 @@ export default function TiendasPage() {
               {loadingTransfer ? (
                 <div className="text-center py-8">
                   <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mt-2">Cargando inventario central...</p>
+                </div>
+              ) : filteredTransferItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">
+                    {transferItems.length === 0 
+                      ? 'No hay productos con stock en el inventario central' 
+                      : 'No se encontraron productos con los filtros aplicados'
+                    }
+                  </p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
