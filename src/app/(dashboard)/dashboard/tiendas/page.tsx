@@ -798,7 +798,15 @@ export default function TiendasPage() {
             ) : (
               <>
                 {/* Stats de la tienda */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="bg-muted p-3 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Productos</p>
+                    <p className="text-lg font-bold">{tiendaStats.totalProductos}</p>
+                  </div>
+                  <div className="bg-muted p-3 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Unidades</p>
+                    <p className="text-lg font-bold">{tiendaStats.totalUnidades}</p>
+                  </div>
                   <div className="bg-muted p-3 rounded-lg text-center">
                     <p className="text-xs text-muted-foreground">Valor Costo</p>
                     <p className="text-lg font-bold">{formatCurrency(tiendaStats.valorCosto)}</p>
@@ -881,6 +889,7 @@ export default function TiendasPage() {
                           <SelectItem value="10">10</SelectItem>
                           <SelectItem value="50">50</SelectItem>
                           <SelectItem value="100">100</SelectItem>
+                          <SelectItem value="500">500</SelectItem>
                         </SelectContent>
                       </Select>
                       <div className="flex items-center gap-2">
