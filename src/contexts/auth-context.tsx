@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
-import { ROUTES, ERROR_MESSAGES } from '@/lib/constants';
+import { ROUTES, ERROR_MESSAGES, UserRole } from '@/lib/constants';
 import { createBrowserClient } from '@/lib/supabase';
 
 interface AuthContextType {
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return {
                 ...prevUser,
                 permissions: (newData.permissions as User['permissions']) || prevUser.permissions,
-                role: (newData.role as string) || prevUser.role,
+                role: (newData.role as UserRole) || prevUser.role,
                 fullName: (newData.full_name as string) || prevUser.fullName,
                 username: (newData.username as string) || prevUser.username,
               };
