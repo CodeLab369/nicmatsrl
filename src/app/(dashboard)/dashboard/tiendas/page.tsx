@@ -755,31 +755,36 @@ export default function TiendasPage() {
 
         {/* Detalle de Tienda Seleccionada */}
         <Card className="shadow-soft">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle className="text-lg">
-                  {selectedTienda ? `Inventario: ${selectedTienda.nombre}` : 'Selecciona una tienda'}
-                </CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">
+                    {selectedTienda ? `Inventario: ${selectedTienda.nombre}` : 'Selecciona una tienda'}
+                  </CardTitle>
+                  {selectedTienda && (
+                    <p className="text-sm text-muted-foreground">
+                      {tiendaStats.totalProductos} productos • {tiendaStats.totalUnidades} unidades
+                    </p>
+                  )}
+                </div>
                 {selectedTienda && (
-                  <p className="text-sm text-muted-foreground">
-                    {tiendaStats.totalProductos} productos • {tiendaStats.totalUnidades} unidades
-                  </p>
+                  <Button onClick={handleOpenTransfer} size="sm" className="gap-1.5 shrink-0">
+                    <Send className="h-4 w-4" />
+                    <span className="hidden sm:inline">Enviar Productos</span>
+                    <span className="sm:hidden">Enviar</span>
+                  </Button>
                 )}
               </div>
               {selectedTienda && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={handleExportTiendaInventory} className="gap-2" disabled={tiendaStats.totalProductos === 0}>
+                  <Button variant="outline" size="sm" onClick={handleExportTiendaInventory} className="gap-1.5" disabled={tiendaStats.totalProductos === 0}>
                     <Download className="h-4 w-4" />
-                    Exportar
+                    <span className="hidden xs:inline">Exportar</span>
                   </Button>
-                  <Button variant="outline" onClick={() => setReturnDialogOpen(true)} className="gap-2" disabled={tiendaStats.totalUnidades === 0}>
+                  <Button variant="outline" size="sm" onClick={() => setReturnDialogOpen(true)} className="gap-1.5" disabled={tiendaStats.totalUnidades === 0}>
                     <Undo2 className="h-4 w-4" />
-                    Devolver Todo
-                  </Button>
-                  <Button onClick={handleOpenTransfer} className="gap-2">
-                    <Send className="h-4 w-4" />
-                    Enviar Productos
+                    <span className="hidden xs:inline">Devolver Todo</span>
                   </Button>
                 </div>
               )}
