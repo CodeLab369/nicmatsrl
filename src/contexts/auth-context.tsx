@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import { ROUTES, ERROR_MESSAGES } from '@/lib/constants';
+import { createBrowserClient } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -16,8 +17,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Intervalo de heartbeat (30 segundos)
-const HEARTBEAT_INTERVAL = 30000;
+// Intervalo de heartbeat (10 segundos para detección más rápida)
+const HEARTBEAT_INTERVAL = 10000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -34,10 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json();
       
       // Si el usuario fue desactivado, forzar logout
-      if (data.forceLogout) {
+      if (data.forceLogout || response.status === 403) {
         console.log('Usuario desactivado, cerrando sesión...');
+        // Limpiar cookie de sesión
+        await fetch('/api/auth/logout', { method: 'POST' });
         setUser(null);
         router.push(ROUTES.LOGIN);
+        return;
       }
     } catch (error) {
       console.error('Heartbeat error:', error);
@@ -66,6 +70,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkSession();
   }, [checkSession]);
+
+  // Suscripción Realtime para detectar cambios en el usuario actual (desactivación)
+  useEffect(() => {
+    if (!user) return;
+
+    const supabase = createBrowserClient();
+    
+    const channel = supabase
+      .channel(`user-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'users',
+          filter: `id=eq.${user.id}`
+        },
+        async (payload) => {
+          console.log('[Auth] Cambio detectado en usuario actual:', payload);
+          // Si el usuario fue desactivado, forzar logout inmediato
+          if (payload.new && payload.new.is_active === false) {
+            console.log('[Auth] Usuario desactivado, forzando logout...');
+            await fetch('/api/auth/logout', { method: 'POST' });
+            setUser(null);
+            router.push(ROUTES.LOGIN);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, router]);
 
   // Iniciar heartbeat cuando hay usuario
   useEffect(() => {

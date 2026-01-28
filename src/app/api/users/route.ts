@@ -59,7 +59,10 @@ export async function GET() {
 // POST - Crear usuario
 export async function POST(request: NextRequest) {
   try {
-    const { username, password, fullName, role, permissions } = await request.json();
+    const body = await request.json();
+    const { username, password, fullName, role, permissions } = body;
+    
+    console.log('Creating user with permissions:', JSON.stringify(permissions));
 
     if (!username || !password || !fullName || !role) {
       return NextResponse.json(
@@ -147,7 +150,10 @@ export async function DELETE(request: NextRequest) {
 // PATCH - Actualizar usuario
 export async function PATCH(request: NextRequest) {
   try {
-    const { id, username, fullName, role, isActive, newPassword, permissions } = await request.json();
+    const body = await request.json();
+    const { id, username, fullName, role, isActive, newPassword, permissions } = body;
+    
+    console.log('Updating user:', id, 'with permissions:', JSON.stringify(permissions), 'isActive:', isActive);
 
     if (!id) {
       return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });
