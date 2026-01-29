@@ -205,6 +205,14 @@ export default function TiendasPage() {
   const [isAnalyzingSaldos, setIsAnalyzingSaldos] = useState(false);
   const [isImportingSaldos, setIsImportingSaldos] = useState(false);
   const [saldosFile, setSaldosFile] = useState<File | null>(null);
+  const [saldosMode, setSaldosMode] = useState<'import' | 'manual'>('import');
+  const [manualSaldoItems, setManualSaldoItems] = useState<Array<{
+    marca: string;
+    amperaje: string;
+    cantidad: number;
+    precio_venta: number;
+  }>>([]);
+  const [newSaldoItem, setNewSaldoItem] = useState({ marca: '', amperaje: '', cantidad: 1, precio_venta: 0 });
   
   // Configuración de empresa para PDF
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(defaultEmpresaConfig);
@@ -2406,6 +2414,81 @@ export default function TiendasPage() {
     }
   };
 
+  // Agregar item manualmente al saldo
+  const handleAddManualSaldoItem = () => {
+    if (!newSaldoItem.marca.trim() || !newSaldoItem.amperaje.trim() || newSaldoItem.cantidad <= 0 || newSaldoItem.precio_venta <= 0) {
+      toast({ title: 'Error', description: 'Completa todos los campos correctamente', variant: 'destructive' });
+      return;
+    }
+    
+    // Verificar si ya existe
+    const existingIndex = manualSaldoItems.findIndex(
+      item => item.marca.toLowerCase() === newSaldoItem.marca.toLowerCase() && 
+              item.amperaje.toLowerCase() === newSaldoItem.amperaje.toLowerCase()
+    );
+    
+    if (existingIndex >= 0) {
+      // Actualizar existente
+      setManualSaldoItems(prev => prev.map((item, i) => 
+        i === existingIndex 
+          ? { ...item, cantidad: item.cantidad + newSaldoItem.cantidad, precio_venta: newSaldoItem.precio_venta }
+          : item
+      ));
+    } else {
+      // Agregar nuevo
+      setManualSaldoItems(prev => [...prev, { ...newSaldoItem }]);
+    }
+    
+    setNewSaldoItem({ marca: '', amperaje: '', cantidad: 1, precio_venta: 0 });
+  };
+
+  // Eliminar item del saldo manual
+  const handleRemoveManualSaldoItem = (index: number) => {
+    setManualSaldoItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Guardar saldos manuales
+  const handleSaveManualSaldos = async () => {
+    if (!selectedTienda || manualSaldoItems.length === 0) return;
+
+    try {
+      setIsImportingSaldos(true);
+
+      const response = await fetch('/api/tienda-inventario/saldos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tiendaId: selectedTienda.id,
+          productos: manualSaldoItems,
+          mode: 'import'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error);
+
+      toast({ 
+        title: 'Saldos guardados', 
+        description: result.message, 
+        variant: 'success' 
+      });
+
+      setSaldosDialogOpen(false);
+      setManualSaldoItems([]);
+      setSaldosMode('import');
+      fetchTiendaInventory();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al guardar saldos', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsImportingSaldos(false);
+    }
+  };
+
   // Descargar formato de saldos
   const handleDownloadSaldosFormat = async () => {
     const XLSX = await import('xlsx');
@@ -3598,92 +3681,286 @@ export default function TiendasPage() {
           setSaldosDialogOpen(false);
           setSaldosAnalysis(null);
           setSaldosFile(null);
+          setManualSaldoItems([]);
+          setSaldosMode('import');
         }
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Importar Saldo Anterior
+              <Package className="h-5 w-5" />
+              Saldo Anterior - {selectedTienda?.nombre}
             </DialogTitle>
             <DialogDescription>
-              Carga el inventario existente de la tienda <strong>{selectedTienda?.nombre}</strong> antes de agregar nuevos productos.
+              Ingresa el inventario existente de la tienda antes de agregar nuevos productos
             </DialogDescription>
           </DialogHeader>
 
-          {saldosAnalysis && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <p className="text-2xl font-bold">{saldosAnalysis.total}</p>
-                  <p className="text-xs text-muted-foreground">Total en archivo</p>
-                </div>
-                <div className="text-center p-3 bg-green-500/10 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{saldosAnalysis.new}</p>
-                  <p className="text-xs text-muted-foreground">Nuevos</p>
-                </div>
-                <div className="text-center p-3 bg-blue-500/10 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{saldosAnalysis.existing}</p>
-                  <p className="text-xs text-muted-foreground">Actualizar</p>
-                </div>
-              </div>
-
-              {saldosAnalysis.newItems.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Productos nuevos (muestra):</p>
-                  <div className="text-xs space-y-1 max-h-24 overflow-y-auto bg-muted/50 p-2 rounded">
-                    {saldosAnalysis.newItems.map((item: any, i: number) => (
-                      <div key={i} className="flex justify-between">
-                        <span>{item.marca} {item.amperaje}</span>
-                        <span className="text-muted-foreground">{item.cantidad} u.</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {saldosAnalysis.updateItems.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Productos a actualizar (muestra):</p>
-                  <div className="text-xs space-y-1 max-h-24 overflow-y-auto bg-muted/50 p-2 rounded">
-                    {saldosAnalysis.updateItems.map((item: any, i: number) => (
-                      <div key={i} className="flex justify-between">
-                        <span>{item.marca} {item.amperaje}</span>
-                        <span className="text-muted-foreground">+{item.cantidad} u.</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <p className="text-xs text-muted-foreground">
-                Los productos existentes sumarán las cantidades. Los precios se actualizarán con los del archivo.
-              </p>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleDownloadSaldosFormat} size="sm">
-              <Download className="h-4 w-4 mr-1" />
-              Formato
+          {/* Tabs para elegir modo */}
+          <div className="flex gap-2 border-b pb-2">
+            <Button 
+              variant={saldosMode === 'import' ? 'default' : 'ghost'} 
+              size="sm"
+              onClick={() => setSaldosMode('import')}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Importar Excel
             </Button>
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setSaldosDialogOpen(false)}>
+            <Button 
+              variant={saldosMode === 'manual' ? 'default' : 'ghost'} 
+              size="sm"
+              onClick={() => setSaldosMode('manual')}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Ingreso Manual
+            </Button>
+          </div>
+
+          {/* Contenido según modo */}
+          <div className="flex-1 overflow-y-auto">
+            {saldosMode === 'import' ? (
+              /* Modo Importar Excel */
+              <div className="space-y-4 py-2">
+                {!saldosAnalysis ? (
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4">Selecciona un archivo Excel con los saldos</p>
+                    <div className="flex justify-center gap-2">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleAnalyzeSaldos(file);
+                            e.target.value = '';
+                          }}
+                          disabled={isAnalyzingSaldos}
+                        />
+                        <Button variant="default" asChild disabled={isAnalyzingSaldos}>
+                          <span>
+                            {isAnalyzingSaldos ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Analizando...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Seleccionar Archivo
+                              </>
+                            )}
+                          </span>
+                        </Button>
+                      </label>
+                      <Button variant="outline" onClick={handleDownloadSaldosFormat}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Descargar Formato
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-muted rounded-lg">
+                        <p className="text-2xl font-bold">{saldosAnalysis.total}</p>
+                        <p className="text-xs text-muted-foreground">Total en archivo</p>
+                      </div>
+                      <div className="text-center p-3 bg-green-500/10 rounded-lg">
+                        <p className="text-2xl font-bold text-green-600">{saldosAnalysis.new}</p>
+                        <p className="text-xs text-muted-foreground">Nuevos</p>
+                      </div>
+                      <div className="text-center p-3 bg-blue-500/10 rounded-lg">
+                        <p className="text-2xl font-bold text-blue-600">{saldosAnalysis.existing}</p>
+                        <p className="text-xs text-muted-foreground">Actualizar</p>
+                      </div>
+                    </div>
+
+                    {saldosAnalysis.newItems.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Productos nuevos:</p>
+                        <div className="text-xs space-y-1 max-h-32 overflow-y-auto bg-muted/50 p-2 rounded">
+                          {saldosAnalysis.newItems.map((item: any, i: number) => (
+                            <div key={i} className="flex justify-between">
+                              <span>{item.marca} {item.amperaje}</span>
+                              <span className="text-muted-foreground">{item.cantidad} u. - Bs. {item.precio_venta}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {saldosAnalysis.updateItems.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Productos a actualizar:</p>
+                        <div className="text-xs space-y-1 max-h-32 overflow-y-auto bg-muted/50 p-2 rounded">
+                          {saldosAnalysis.updateItems.map((item: any, i: number) => (
+                            <div key={i} className="flex justify-between">
+                              <span>{item.marca} {item.amperaje}</span>
+                              <span className="text-muted-foreground">+{item.cantidad} u.</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setSaldosAnalysis(null); setSaldosFile(null); }}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cambiar archivo
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Modo Ingreso Manual */
+              <div className="space-y-4 py-2">
+                {/* Formulario para agregar */}
+                <div className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
+                  <div className="col-span-3">
+                    <Label className="text-xs">Marca</Label>
+                    <Input
+                      placeholder="Ej: BOSCH"
+                      value={newSaldoItem.marca}
+                      onChange={(e) => setNewSaldoItem(prev => ({ ...prev, marca: e.target.value.toUpperCase() }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="text-xs">Amperaje</Label>
+                    <Input
+                      placeholder="Ej: 60AH"
+                      value={newSaldoItem.amperaje}
+                      onChange={(e) => setNewSaldoItem(prev => ({ ...prev, amperaje: e.target.value.toUpperCase() }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Cantidad</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={newSaldoItem.cantidad}
+                      onChange={(e) => setNewSaldoItem(prev => ({ ...prev, cantidad: parseInt(e.target.value) || 0 }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Precio Venta</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newSaldoItem.precio_venta || ''}
+                      onChange={(e) => setNewSaldoItem(prev => ({ ...prev, precio_venta: parseFloat(e.target.value) || 0 }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Button onClick={handleAddManualSaldoItem} size="sm" className="w-full h-9">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Lista de productos agregados */}
+                {manualSaldoItems.length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left py-2 px-3 font-medium">Marca</th>
+                          <th className="text-left py-2 px-3 font-medium">Amperaje</th>
+                          <th className="text-center py-2 px-3 font-medium">Cantidad</th>
+                          <th className="text-right py-2 px-3 font-medium">Precio</th>
+                          <th className="text-right py-2 px-3 font-medium">Subtotal</th>
+                          <th className="w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {manualSaldoItems.map((item, index) => (
+                          <tr key={index} className="border-t hover:bg-muted/50">
+                            <td className="py-2 px-3 font-medium">{item.marca}</td>
+                            <td className="py-2 px-3">{item.amperaje}</td>
+                            <td className="py-2 px-3 text-center">{item.cantidad}</td>
+                            <td className="py-2 px-3 text-right">{formatCurrency(item.precio_venta)}</td>
+                            <td className="py-2 px-3 text-right font-medium">{formatCurrency(item.precio_venta * item.cantidad)}</td>
+                            <td className="py-2 px-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleRemoveManualSaldoItem(index)}
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-muted/50">
+                        <tr className="border-t-2">
+                          <td colSpan={2} className="py-2 px-3 font-bold">Total</td>
+                          <td className="py-2 px-3 text-center font-bold">
+                            {manualSaldoItems.reduce((sum, i) => sum + i.cantidad, 0)}
+                          </td>
+                          <td></td>
+                          <td className="py-2 px-3 text-right font-bold">
+                            {formatCurrency(manualSaldoItems.reduce((sum, i) => sum + (i.precio_venta * i.cantidad), 0))}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Agrega productos usando el formulario de arriba</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => { setSaldosDialogOpen(false); setManualSaldoItems([]); setSaldosMode('import'); }}>
               Cancelar
             </Button>
-            <Button onClick={handleImportSaldos} disabled={isImportingSaldos || !saldosAnalysis}>
-              {isImportingSaldos ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar Importación
-                </>
-              )}
-            </Button>
+            {saldosMode === 'import' ? (
+              <Button onClick={handleImportSaldos} disabled={isImportingSaldos || !saldosAnalysis}>
+                {isImportingSaldos ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirmar Importación
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button onClick={handleSaveManualSaldos} disabled={isImportingSaldos || manualSaldoItems.length === 0}>
+                {isImportingSaldos ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Saldos ({manualSaldoItems.length} productos)
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
