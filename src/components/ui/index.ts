@@ -14,3 +14,4 @@ export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 export { Badge } from './badge';
 export { LoadingSpinner, PageLoader, TableSkeleton, CardSkeleton } from './loading';
 export { Checkbox } from './checkbox';
+export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';

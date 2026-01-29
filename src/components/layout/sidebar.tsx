@@ -11,6 +11,7 @@ import {
   Users,
   UserCog,
   Store,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts';
@@ -66,6 +67,11 @@ const navigation: NavGroup[] = [
         href: ROUTES.QUOTATIONS,
         icon: FileText,
         permission: 'cotizaciones',
+      },
+      {
+        title: 'Movimientos',
+        href: ROUTES.MOVEMENTS,
+        icon: TrendingUp,
       },
     ],
   },

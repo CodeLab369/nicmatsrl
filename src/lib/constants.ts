@@ -55,6 +55,9 @@ export const ROUTES = {
   
   // Tiendas
   STORES: '/dashboard/tiendas',
+  
+  // Movimientos (Control Financiero)
+  MOVEMENTS: '/dashboard/movimientos',
 } as const;
 
 // Mensajes de error comunes
