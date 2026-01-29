@@ -794,6 +794,22 @@ export default function MovimientosPage() {
                         </div>
                       ) : (
                         <div className="space-y-3">
+                          {/* Resumen de totales */}
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div>
+                              <p className="text-xs md:text-sm text-muted-foreground">Total Ventas</p>
+                              <p className="text-lg md:text-xl font-bold">{formatCurrency(selectedTienda.ventas.total)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs md:text-sm text-muted-foreground">Total Ganancia</p>
+                              <p className="text-lg md:text-xl font-bold text-green-600">{formatCurrency(selectedTienda.ventas.ganancia)}</p>
+                            </div>
+                            <div className="col-span-2 md:col-span-1">
+                              <p className="text-xs md:text-sm text-muted-foreground">Cantidad de Ventas</p>
+                              <p className="text-lg md:text-xl font-bold">{selectedTienda.ventas.cantidad}</p>
+                            </div>
+                          </div>
+
                           {ventas.map((venta) => (
                             <div key={venta.id} className="border rounded-lg overflow-hidden">
                               {/* Header de la venta */}
