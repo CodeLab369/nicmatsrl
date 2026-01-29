@@ -72,8 +72,30 @@ export async function GET(request: NextRequest) {
       totalGanancia: totalsData?.reduce((sum, v) => sum + (v.ganancia || 0), 0) || 0,
     };
 
+    // Obtener items de cada venta para mostrar detalle
+    const ventaIds = ventas?.map(v => v.id) || [];
+    const { data: allItems } = await supabase
+      .from('tienda_venta_items')
+      .select('id, venta_id, marca, amperaje, cantidad, precio_venta, subtotal')
+      .in('venta_id', ventaIds)
+      .order('marca');
+
+    // Agrupar items por venta
+    const itemsByVenta = new Map<string, typeof allItems>();
+    allItems?.forEach(item => {
+      const existing = itemsByVenta.get(item.venta_id) || [];
+      existing.push(item);
+      itemsByVenta.set(item.venta_id, existing);
+    });
+
+    // Agregar items a cada venta
+    const ventasConItems = ventas?.map(venta => ({
+      ...venta,
+      items: itemsByVenta.get(venta.id) || []
+    })) || [];
+
     return NextResponse.json({
-      ventas: ventas || [],
+      ventas: ventasConItems,
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / limit),

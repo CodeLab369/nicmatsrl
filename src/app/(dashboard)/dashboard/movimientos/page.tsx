@@ -161,7 +161,7 @@ export default function MovimientosPage() {
 
   // Agregar gasto
   const [agregarGastoOpen, setAgregarGastoOpen] = useState(false);
-  const [gastoForm, setGastoForm] = useState({ categoria: '', descripcion: '', monto: '', fecha: '' });
+  const [gastoForm, setGastoForm] = useState({ categoria: '', categoriaOtro: '', descripcion: '', monto: '', fecha: '' });
   const [categoriasSugeridas, setCategoriasSugeridas] = useState<string[]>([]);
   const [isSubmittingGasto, setIsSubmittingGasto] = useState(false);
 
@@ -429,8 +429,10 @@ export default function MovimientosPage() {
   };
 
   const handleSubmitGasto = async () => {
-    if (!selectedTienda || !gastoForm.categoria || !gastoForm.monto) {
-      toast({ title: 'Error', description: 'Categoría y monto son requeridos', variant: 'destructive' });
+    const categoriaFinal = gastoForm.categoria === 'Otro' ? gastoForm.categoriaOtro : gastoForm.categoria;
+    
+    if (!selectedTienda || !categoriaFinal || !gastoForm.monto) {
+      toast({ title: 'Error', description: 'Concepto y monto son requeridos', variant: 'destructive' });
       return;
     }
 
@@ -442,7 +444,9 @@ export default function MovimientosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tiendaId: selectedTienda.id,
-          ...gastoForm,
+          categoria: categoriaFinal,
+          descripcion: gastoForm.descripcion,
+          fecha: gastoForm.fecha,
           monto: parseFloat(gastoForm.monto)
         })
       });
@@ -453,6 +457,7 @@ export default function MovimientosPage() {
 
       toast({ title: 'Gasto registrado', description: data.message, variant: 'success' });
       setAgregarGastoOpen(false);
+      setGastoForm({ categoria: '', categoriaOtro: '', descripcion: '', monto: '', fecha: '' });
       fetchGastos();
       fetchResumen();
       fetchCategorias();
@@ -781,34 +786,64 @@ export default function MovimientosPage() {
                           <p>No hay ventas registradas en este período</p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {ventas.map((venta) => (
-                            <div key={venta.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                              <div className="flex items-center gap-4">
-                                <div className="text-center min-w-[60px]">
-                                  <p className="text-sm font-medium">{new Date(venta.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</p>
+                            <div key={venta.id} className="border rounded-lg overflow-hidden">
+                              {/* Header de la venta */}
+                              <div className="flex items-center justify-between p-3 bg-muted/30">
+                                <div className="flex items-center gap-4">
+                                  <div className="text-center min-w-[60px]">
+                                    <p className="text-sm font-medium">{new Date(venta.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{formatCurrency(venta.total_venta)}</p>
+                                    <p className="text-sm text-green-600">+{formatCurrency(venta.ganancia)} ganancia</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="font-medium">{formatCurrency(venta.total_venta)}</p>
-                                  <p className="text-sm text-green-600">+{formatCurrency(venta.ganancia)}</p>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchVentaDetail(venta.id)}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive"
+                                    onClick={() => { setVentaToDelete(venta); setDeleteVentaDialogOpen(true); }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </div>
-                                {venta.notas && (
-                                  <p className="text-sm text-muted-foreground truncate max-w-[200px]">{venta.notas}</p>
-                                )}
                               </div>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchVentaDetail(venta.id)}>
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive"
-                                  onClick={() => { setVentaToDelete(venta); setDeleteVentaDialogOpen(true); }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              {/* Tabla de productos */}
+                              {venta.items && venta.items.length > 0 && (
+                                <table className="w-full text-sm">
+                                  <thead className="bg-muted/50">
+                                    <tr>
+                                      <th className="text-left py-2 px-3 font-medium">Marca</th>
+                                      <th className="text-left py-2 px-3 font-medium">Amperaje</th>
+                                      <th className="text-center py-2 px-3 font-medium">Cant.</th>
+                                      <th className="text-right py-2 px-3 font-medium">Precio</th>
+                                      <th className="text-right py-2 px-3 font-medium">Subtotal</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {venta.items.map((item: { id: string; marca: string; amperaje: string; cantidad: number; precio_venta: number; subtotal: number }) => (
+                                      <tr key={item.id} className="border-t border-muted">
+                                        <td className="py-2 px-3 font-medium">{item.marca}</td>
+                                        <td className="py-2 px-3">{item.amperaje}</td>
+                                        <td className="py-2 px-3 text-center">{item.cantidad}</td>
+                                        <td className="py-2 px-3 text-right">{formatCurrency(item.precio_venta)}</td>
+                                        <td className="py-2 px-3 text-right font-medium">{formatCurrency(item.subtotal)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                              {venta.notas && (
+                                <div className="px-3 py-2 bg-muted/20 border-t text-sm text-muted-foreground">
+                                  <span className="font-medium">Nota:</span> {venta.notas}
+                                </div>
+                              )}
                             </div>
                           ))}
 
@@ -854,7 +889,7 @@ export default function MovimientosPage() {
                                 <div>
                                   <p className="font-medium">{gasto.categoria}</p>
                                   {gasto.descripcion && (
-                                    <p className="text-sm text-muted-foreground truncate max-w-[250px]">{gasto.descripcion}</p>
+                                    <p className="text-sm text-muted-foreground max-w-[250px]">{gasto.descripcion}</p>
                                   )}
                                 </div>
                               </div>
@@ -1133,23 +1168,41 @@ export default function MovimientosPage() {
 
           <div className="space-y-4">
             <div>
-              <Label>Categoría *</Label>
-              <Input
-                placeholder="Ej: Servicios Básicos, Material de Escritorio..."
+              <Label>Concepto *</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={gastoForm.categoria}
                 onChange={(e) => setGastoForm(prev => ({ ...prev, categoria: e.target.value }))}
-                list="categorias-sugeridas"
-              />
-              <datalist id="categorias-sugeridas">
-                {categoriasSugeridas.map((cat, i) => (
-                  <option key={i} value={cat} />
+              >
+                <option value="">Seleccionar concepto...</option>
+                <option value="Servicios Básicos">Servicios Básicos</option>
+                <option value="Material de Escritorio">Material de Escritorio</option>
+                <option value="Material de Limpieza">Material de Limpieza</option>
+                <option value="Alquiler">Alquiler</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Publicidad">Publicidad</option>
+                <option value="Mantenimiento">Mantenimiento</option>
+                <option value="Sueldos">Sueldos</option>
+                <option value="Impuestos">Impuestos</option>
+                {categoriasSugeridas.filter(c => !['Servicios Básicos', 'Material de Escritorio', 'Material de Limpieza', 'Alquiler', 'Transporte', 'Publicidad', 'Mantenimiento', 'Sueldos', 'Impuestos'].includes(c)).map((cat, i) => (
+                  <option key={i} value={cat}>{cat}</option>
                 ))}
-              </datalist>
+                <option value="Otro">Otro...</option>
+              </select>
+              {gastoForm.categoria === 'Otro' && (
+                <Input
+                  className="mt-2"
+                  placeholder="Especificar concepto..."
+                  value={gastoForm.categoriaOtro || ''}
+                  onChange={(e) => setGastoForm(prev => ({ ...prev, categoriaOtro: e.target.value }))}
+                />
+              )}
             </div>
 
             <div>
               <Label>Descripción (opcional)</Label>
-              <Input
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
                 placeholder="Detalle del gasto..."
                 value={gastoForm.descripcion}
                 onChange={(e) => setGastoForm(prev => ({ ...prev, descripcion: e.target.value }))}
