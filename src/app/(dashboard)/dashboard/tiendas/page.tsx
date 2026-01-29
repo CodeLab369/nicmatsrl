@@ -5,7 +5,8 @@ import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
   Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download,
-  Upload, FileSpreadsheet, Clock, Check, AlertCircle, Printer, Settings
+  Upload, FileSpreadsheet, Clock, Check, AlertCircle, Printer, Settings,
+  Copy, Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -195,6 +196,8 @@ export default function TiendasPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [deleteEnvioDialogOpen, setDeleteEnvioDialogOpen] = useState(false);
   const [envioToDelete, setEnvioToDelete] = useState<TiendaEnvio | null>(null);
+  const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
+  const [isSavingPrices, setIsSavingPrices] = useState(false);
   
   // Saldos anteriores
   const [saldosDialogOpen, setSaldosDialogOpen] = useState(false);
@@ -744,6 +747,84 @@ export default function TiendasPage() {
     } finally {
       setIsImporting(false);
     }
+  };
+
+  // Guardar precios editados manualmente
+  const handleSavePrices = async () => {
+    if (!selectedEnvio) return;
+    
+    const itemsToUpdate = Object.entries(editedPrices).map(([id, precio]) => ({
+      id,
+      precio_tienda: precio
+    }));
+
+    if (itemsToUpdate.length === 0) {
+      toast({ title: 'Sin cambios', description: 'No hay precios modificados', variant: 'default' });
+      return;
+    }
+
+    try {
+      setIsSavingPrices(true);
+      const response = await fetch('/api/tienda-envios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          envioId: selectedEnvio.id, 
+          action: 'importar_precios',
+          items: itemsToUpdate
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error);
+
+      toast({ 
+        title: 'Precios guardados', 
+        description: `${itemsToUpdate.length} precios actualizados`, 
+        variant: 'success' 
+      });
+
+      // Limpiar ediciones y recargar
+      setEditedPrices({});
+      fetchEnviosPendientes();
+      fetchEnvioDetail(selectedEnvio.id);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al guardar precios', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsSavingPrices(false);
+    }
+  };
+
+  // Manejar cambio de precio en la tabla
+  const handlePriceChange = (itemId: string, value: string) => {
+    const precio = parseFloat(value);
+    if (!isNaN(precio) && precio >= 0) {
+      setEditedPrices(prev => ({ ...prev, [itemId]: precio }));
+    } else if (value === '') {
+      // Permitir borrar para escribir nuevo valor
+      setEditedPrices(prev => {
+        const newPrices = { ...prev };
+        delete newPrices[itemId];
+        return newPrices;
+      });
+    }
+  };
+
+  // Aplicar precio original a todos los que no tienen precio
+  const handleApplyOriginalPrices = () => {
+    const newPrices: Record<string, number> = { ...editedPrices };
+    envioItems.forEach(item => {
+      if (item.precio_tienda === null && !newPrices[item.id]) {
+        newPrices[item.id] = item.precio_venta_original;
+      }
+    });
+    setEditedPrices(newPrices);
+    toast({ title: 'Precios aplicados', description: 'Se aplicaron los precios originales a los productos sin precio', variant: 'success' });
   };
 
   // Confirmar envío (mover a inventario de tienda)
@@ -3237,8 +3318,11 @@ export default function TiendasPage() {
       </AlertDialog>
 
       {/* Dialog Detalle de Envío */}
-      <Dialog open={envioDetailOpen} onOpenChange={setEnvioDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+      <Dialog open={envioDetailOpen} onOpenChange={(open) => {
+        setEnvioDetailOpen(open);
+        if (!open) setEditedPrices({});
+      }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5" />
@@ -3251,10 +3335,54 @@ export default function TiendasPage() {
                   <span className="text-muted-foreground">
                     {selectedEnvio.total_productos} productos • {selectedEnvio.total_unidades} unidades
                   </span>
+                  {selectedEnvio.estado !== 'completado' && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Edita los precios directamente en la tabla)
+                    </span>
+                  )}
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Barra de acciones para precios */}
+          {selectedEnvio?.estado !== 'completado' && (
+            <div className="flex items-center gap-2 py-2 px-1 bg-muted/50 rounded-lg">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleApplyOriginalPrices}
+                className="gap-1.5"
+              >
+                <Copy className="h-4 w-4" />
+                Aplicar Precios Originales
+              </Button>
+              <div className="flex-1" />
+              {Object.keys(editedPrices).length > 0 && (
+                <Badge variant="secondary" className="mr-2">
+                  {Object.keys(editedPrices).length} precio(s) modificado(s)
+                </Badge>
+              )}
+              <Button 
+                size="sm" 
+                onClick={handleSavePrices}
+                disabled={isSavingPrices || Object.keys(editedPrices).length === 0}
+                className="gap-1.5"
+              >
+                {isSavingPrices ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Guardar Precios
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto">
             {loadingEnvioItems ? (
@@ -3269,32 +3397,60 @@ export default function TiendasPage() {
                     <th className="text-left py-3 px-4 font-medium">Amperaje</th>
                     <th className="text-center py-3 px-4 font-medium">Cantidad</th>
                     <th className="text-right py-3 px-4 font-medium">Precio Original</th>
-                    <th className="text-right py-3 px-4 font-medium">Precio Tienda</th>
+                    <th className="text-right py-3 px-4 font-medium w-40">Precio Tienda</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {envioItems.map((item) => (
-                    <tr key={item.id} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-4 font-medium">{item.marca}</td>
-                      <td className="py-3 px-4">{item.amperaje}</td>
-                      <td className="py-3 px-4 text-center">
-                        <Badge variant="secondary">{item.cantidad}</Badge>
-                      </td>
-                      <td className="py-3 px-4 text-right text-muted-foreground">
-                        {formatCurrency(item.precio_venta_original)}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {item.precio_tienda !== null ? (
-                          <span className="font-medium text-green-600">{formatCurrency(item.precio_tienda)}</span>
-                        ) : (
-                          <span className="text-amber-500 flex items-center justify-end gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Sin precio
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {envioItems.map((item) => {
+                    const editedPrice = editedPrices[item.id];
+                    const currentPrice = editedPrice !== undefined ? editedPrice : item.precio_tienda;
+                    const hasChange = editedPrice !== undefined;
+                    
+                    return (
+                      <tr key={item.id} className={`border-b hover:bg-muted/50 ${hasChange ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}>
+                        <td className="py-3 px-4 font-medium">{item.marca}</td>
+                        <td className="py-3 px-4">{item.amperaje}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Badge variant="secondary">{item.cantidad}</Badge>
+                        </td>
+                        <td className="py-3 px-4 text-right text-muted-foreground">
+                          {formatCurrency(item.precio_venta_original)}
+                        </td>
+                        <td className="py-2 px-4">
+                          {selectedEnvio?.estado === 'completado' ? (
+                            <span className="font-medium text-green-600 text-right block">
+                              {formatCurrency(item.precio_tienda || 0)}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1 justify-end">
+                              <span className="text-muted-foreground text-xs">Bs.</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className={`w-24 h-8 text-right text-sm ${
+                                  hasChange 
+                                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' 
+                                    : currentPrice !== null 
+                                      ? 'border-green-400' 
+                                      : 'border-amber-400'
+                                }`}
+                                value={currentPrice ?? ''}
+                                onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                                placeholder="0.00"
+                              />
+                              {currentPrice !== null && !hasChange && (
+                                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                              )}
+                              {hasChange && (
+                                <span className="text-amber-500 text-xs">*</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -3321,23 +3477,28 @@ export default function TiendasPage() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file && selectedEnvio) handleImportEnvio(selectedEnvio.id, file);
+                  if (file && selectedEnvio) {
+                    handleImportEnvio(selectedEnvio.id, file);
+                    setEditedPrices({});
+                  }
                   e.target.value = '';
                 }}
                 disabled={isImporting || selectedEnvio?.estado === 'completado'}
               />
-              <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+              <Button variant="outline" className="gap-2" asChild disabled={isImporting || selectedEnvio?.estado === 'completado'}>
                 <span>
                   <Upload className="h-4 w-4" />
                   {isImporting ? 'Importando...' : 'Importar Precios'}
                 </span>
               </Button>
             </label>
-            {selectedEnvio?.estado === 'precios_asignados' && (
+            {(selectedEnvio?.estado === 'precios_asignados' || 
+              (selectedEnvio?.estado === 'pendiente' && envioItems.every(i => (editedPrices[i.id] !== undefined) || i.precio_tienda !== null))) && (
               <Button 
                 onClick={() => selectedEnvio && handleConfirmEnvio(selectedEnvio.id)} 
-                disabled={isConfirming}
+                disabled={isConfirming || Object.keys(editedPrices).length > 0}
                 className="gap-2"
+                title={Object.keys(editedPrices).length > 0 ? 'Guarda los precios primero' : ''}
               >
                 {isConfirming ? (
                   <>
@@ -3352,7 +3513,7 @@ export default function TiendasPage() {
                 )}
               </Button>
             )}
-            <Button variant="ghost" onClick={() => setEnvioDetailOpen(false)}>
+            <Button variant="ghost" onClick={() => { setEnvioDetailOpen(false); setEditedPrices({}); }}>
               Cerrar
             </Button>
           </DialogFooter>
