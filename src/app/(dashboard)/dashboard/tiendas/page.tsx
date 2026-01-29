@@ -209,6 +209,15 @@ export default function TiendasPage() {
   const [configForm, setConfigForm] = useState<EmpresaConfig>(defaultEmpresaConfig);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   
+  // PDF después de confirmar envío
+  const [printConfirmDialogOpen, setPrintConfirmDialogOpen] = useState(false);
+  const [lastConfirmedEnvio, setLastConfirmedEnvio] = useState<{
+    envio: TiendaEnvio;
+    items: EnvioItem[];
+    tienda: Tienda;
+    saldoAnterior: TiendaInventoryItem[];
+  } | null>(null);
+  
   const { toast } = useToast();
 
   // Fetch tiendas
@@ -711,8 +720,17 @@ export default function TiendasPage() {
 
   // Confirmar envío (mover a inventario de tienda)
   const handleConfirmEnvio = async (envioId: string) => {
+    if (!selectedTienda) return;
+    
     try {
       setIsConfirming(true);
+      
+      // Guardar el saldo anterior antes de confirmar
+      const saldoAnteriorResponse = await fetch(`/api/tienda-inventario?tiendaId=${selectedTienda.id}&noPagination=true`);
+      const saldoAnteriorData = await saldoAnteriorResponse.json();
+      const saldoAnterior: TiendaInventoryItem[] = saldoAnteriorData.items || [];
+      
+      // Confirmar el envío
       const response = await fetch('/api/tienda-envios', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -728,6 +746,17 @@ export default function TiendasPage() {
         description: data.message, 
         variant: 'success' 
       });
+
+      // Guardar datos para el PDF y mostrar diálogo
+      if (selectedEnvio && selectedTienda) {
+        setLastConfirmedEnvio({
+          envio: selectedEnvio,
+          items: envioItems,
+          tienda: selectedTienda,
+          saldoAnterior
+        });
+        setPrintConfirmDialogOpen(true);
+      }
 
       setEnvioDetailOpen(false);
       setSelectedEnvio(null);
@@ -1221,6 +1250,582 @@ export default function TiendasPage() {
 </body>
 </html>
     `;
+  };
+
+  // Generar HTML para PDF de resumen de envío (saldo anterior + nuevos productos)
+  const generateResumenEnvioPDFHTML = (
+    envio: TiendaEnvio, 
+    items: EnvioItem[], 
+    tienda: Tienda, 
+    saldoAnterior: TiendaInventoryItem[]
+  ) => {
+    const fechaFormat = new Date(envio.created_at).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    const cfg = empresaConfig;
+    const colorPrincipal = cfg.color_principal || '#1a5f7a';
+    
+    function adjustColor(color: string, amount: number): string {
+      const hex = color.replace('#', '');
+      const r = Math.min(255, parseInt(hex.substring(0, 2), 16) + amount);
+      const g = Math.min(255, parseInt(hex.substring(2, 4), 16) + amount);
+      const b = Math.min(255, parseInt(hex.substring(4, 6), 16) + amount);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
+    const gradiente = `linear-gradient(135deg, ${colorPrincipal} 0%, ${adjustColor(colorPrincipal, 40)} 100%)`;
+    
+    const logoHTML = cfg.logo 
+      ? `<img src="${cfg.logo}" alt="Logo" style="width: 70px; height: 70px; object-fit: contain; border-radius: 8px;">`
+      : `<div class="company-logo-placeholder">${cfg.nombre.substring(0, 2).toUpperCase()}</div>`;
+    
+    const telefonos = [cfg.telefono_principal, cfg.telefono_secundario, cfg.telefono_adicional].filter(Boolean).join(' | ');
+
+    // Calcular totales del saldo anterior
+    const totalSaldoAnteriorUnidades = saldoAnterior.reduce((sum, p) => sum + p.cantidad, 0);
+    const totalSaldoAnteriorValor = saldoAnterior.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
+    
+    // Calcular totales de nuevos productos
+    const totalNuevosUnidades = items.reduce((sum, p) => sum + p.cantidad, 0);
+    const totalNuevosValor = items.reduce((sum, p) => sum + ((p.precio_tienda || p.precio_venta_original) * p.cantidad), 0);
+    
+    // Calcular nuevo saldo (combinando anterior + nuevos)
+    const nuevoSaldoMap = new Map<string, { marca: string; amperaje: string; cantidad: number; precio: number }>();
+    
+    // Agregar saldo anterior
+    saldoAnterior.forEach(p => {
+      const key = `${p.marca}-${p.amperaje}`;
+      nuevoSaldoMap.set(key, {
+        marca: p.marca,
+        amperaje: p.amperaje,
+        cantidad: p.cantidad,
+        precio: p.precio_venta
+      });
+    });
+    
+    // Agregar nuevos productos (sumar cantidades si ya existen)
+    items.forEach(p => {
+      const key = `${p.marca}-${p.amperaje}`;
+      const precioTienda = p.precio_tienda || p.precio_venta_original;
+      if (nuevoSaldoMap.has(key)) {
+        const existing = nuevoSaldoMap.get(key)!;
+        nuevoSaldoMap.set(key, {
+          ...existing,
+          cantidad: existing.cantidad + p.cantidad,
+          precio: precioTienda // Usar el nuevo precio
+        });
+      } else {
+        nuevoSaldoMap.set(key, {
+          marca: p.marca,
+          amperaje: p.amperaje,
+          cantidad: p.cantidad,
+          precio: precioTienda
+        });
+      }
+    });
+    
+    const nuevoSaldo = Array.from(nuevoSaldoMap.values()).sort((a, b) => a.marca.localeCompare(b.marca));
+    const totalNuevoSaldoUnidades = nuevoSaldo.reduce((sum, p) => sum + p.cantidad, 0);
+    const totalNuevoSaldoValor = nuevoSaldo.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
+    
+    // Generar HTML de tablas
+    const saldoAnteriorHTML = saldoAnterior.length > 0 
+      ? saldoAnterior.map((p, i) => `
+        <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef; font-weight: 500;">${p.marca}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef;">${p.amperaje}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${p.cantidad}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${p.precio_venta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 600;">Bs. ${(p.precio_venta * p.cantidad).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `).join('')
+      : `<tr><td colspan="6" style="padding: 20px; text-align: center; color: #666;">Sin saldo anterior</td></tr>`;
+    
+    const nuevosProductosHTML = items.map((p, i) => `
+      <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; font-weight: 500;">${p.marca}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef;">${p.amperaje}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${p.cantidad}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${(p.precio_tienda || p.precio_venta_original).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 600;">Bs. ${((p.precio_tienda || p.precio_venta_original) * p.cantidad).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+    
+    const nuevoSaldoHTML = nuevoSaldo.map((p, i) => `
+      <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#e8f5e9'};">
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; font-weight: 500;">${p.marca}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef;">${p.amperaje}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center; font-weight: 600;">${p.cantidad}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${p.precio.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 600;">Bs. ${(p.precio * p.cantidad).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resumen Envío ${tienda.nombre} - ${fechaFormat}</title>
+  <style>
+    :root {
+      --color-principal: ${colorPrincipal};
+      --gradiente: ${gradiente};
+    }
+    @page {
+      size: letter;
+      margin: 10mm;
+    }
+    @media print {
+      html, body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .page-break-before {
+        page-break-before: always;
+      }
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 10pt;
+      color: #333;
+      line-height: 1.4;
+      background: white;
+    }
+    .container {
+      max-width: 100%;
+      padding: 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid var(--color-principal);
+    }
+    .company-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex: 1;
+    }
+    .company-logo-placeholder {
+      width: 60px;
+      height: 60px;
+      background: var(--gradiente);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .company-text {
+      flex: 1;
+    }
+    .company-name {
+      font-size: 20pt;
+      font-weight: 700;
+      color: var(--color-principal);
+      margin-bottom: 3px;
+    }
+    .company-details {
+      font-size: 8pt;
+      color: #666;
+      line-height: 1.5;
+    }
+    .doc-info {
+      text-align: right;
+    }
+    .doc-title {
+      background: var(--gradiente);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 6px;
+      font-size: 12pt;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .doc-date {
+      font-size: 9pt;
+      color: #666;
+    }
+    .tienda-box {
+      background: #f8f9fa;
+      border-left: 4px solid var(--color-principal);
+      padding: 12px 15px;
+      margin-bottom: 20px;
+      border-radius: 0 6px 6px 0;
+    }
+    .tienda-title {
+      font-size: 9pt;
+      font-weight: 600;
+      color: var(--color-principal);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .tienda-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 5px 20px;
+    }
+    .tienda-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 9pt;
+    }
+    .tienda-item label {
+      font-weight: 600;
+      color: var(--color-principal);
+      white-space: nowrap;
+    }
+    .tienda-item label::after {
+      content: ':';
+    }
+    .section-title {
+      font-size: 11pt;
+      font-weight: 700;
+      color: var(--color-principal);
+      margin: 15px 0 10px 0;
+      padding-bottom: 5px;
+      border-bottom: 2px solid var(--color-principal);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title .icon {
+      font-size: 14pt;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      font-size: 9pt;
+    }
+    th {
+      background: var(--gradiente);
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 8pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    th:first-child { border-radius: 6px 0 0 0; }
+    th:last-child { border-radius: 0 6px 0 0; text-align: right; }
+    th:nth-child(4) { text-align: center; }
+    th:nth-child(5) { text-align: right; }
+    td {
+      font-size: 9pt;
+    }
+    .subtotal-row {
+      background: #e3f2fd !important;
+    }
+    .subtotal-row td {
+      font-weight: 600;
+      padding: 10px;
+      border-top: 2px solid var(--color-principal);
+    }
+    .grand-total-section {
+      margin-top: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .grand-total-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+    }
+    .grand-total-box {
+      text-align: center;
+      padding: 10px;
+      border-radius: 6px;
+    }
+    .grand-total-box.anterior {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+    }
+    .grand-total-box.nuevos {
+      background: #e3f2fd;
+      border: 1px solid #64b5f6;
+    }
+    .grand-total-box.total {
+      background: var(--gradiente);
+      color: white;
+    }
+    .grand-total-label {
+      font-size: 8pt;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .grand-total-value {
+      font-size: 14pt;
+      font-weight: 700;
+    }
+    .grand-total-units {
+      font-size: 9pt;
+      margin-top: 3px;
+    }
+    .signature-section {
+      margin-top: 40px;
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+    }
+    .signature-box {
+      flex: 1;
+      text-align: center;
+    }
+    .signature-line {
+      border-top: 1px solid #333;
+      padding-top: 8px;
+      margin-top: 40px;
+    }
+    .signature-label {
+      font-size: 9pt;
+      color: #666;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 15px;
+      border-top: 2px solid #e9ecef;
+      margin-top: 20px;
+    }
+    .footer-company {
+      font-size: 10pt;
+      font-weight: 600;
+      color: var(--color-principal);
+    }
+    .footer-thanks {
+      font-size: 9pt;
+      color: #666;
+      margin: 3px 0;
+    }
+    .footer-contact {
+      font-size: 8pt;
+      color: #888;
+    }
+    .page-break {
+      page-break-inside: avoid;
+    }
+    table {
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="company-info">
+        ${logoHTML}
+        <div class="company-text">
+          <div class="company-name">${cfg.nombre}</div>
+          <div class="company-details">
+            ${cfg.nit ? `NIT: ${cfg.nit}<br>` : ''}
+            ${cfg.direccion ? `${cfg.direccion}` : ''}${cfg.ciudad ? ` - ${cfg.ciudad}` : ''}<br>
+            ${telefonos ? `Tel: ${telefonos}` : ''}${cfg.email ? ` | ${cfg.email}` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="doc-info">
+        <div class="doc-title">RESUMEN DE ENVÍO</div>
+        <div class="doc-date">
+          <strong>Fecha:</strong> ${fechaFormat}
+        </div>
+      </div>
+    </div>
+
+    <!-- Datos de la tienda -->
+    <div class="tienda-box">
+      <div class="tienda-title">Datos de la Tienda</div>
+      <div class="tienda-grid">
+        <div class="tienda-item">
+          <label>Tienda</label>
+          <span>${tienda.nombre}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Encargado</label>
+          <span>${tienda.encargado || '-'}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Ciudad</label>
+          <span>${tienda.ciudad || '-'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saldo Anterior -->
+    <div class="section-title">
+      <span class="icon">📦</span>
+      SALDO ANTERIOR (${totalSaldoAnteriorUnidades} unidades)
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 35px; text-align: center;">N°</th>
+          <th style="width: 25%;">Marca</th>
+          <th style="width: 18%;">Amperaje</th>
+          <th style="width: 12%; text-align: center;">Cant.</th>
+          <th style="width: 18%; text-align: right;">P. Unit.</th>
+          <th style="width: 18%; text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${saldoAnteriorHTML}
+        <tr class="subtotal-row">
+          <td colspan="3" style="text-align: right;">SUBTOTAL SALDO ANTERIOR:</td>
+          <td style="text-align: center;">${totalSaldoAnteriorUnidades}</td>
+          <td></td>
+          <td style="text-align: right;">Bs. ${totalSaldoAnteriorValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Nuevos Productos -->
+    <div class="section-title">
+      <span class="icon">🚚</span>
+      PRODUCTOS ENTREGADOS (${totalNuevosUnidades} unidades)
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 35px; text-align: center;">N°</th>
+          <th style="width: 25%;">Marca</th>
+          <th style="width: 18%;">Amperaje</th>
+          <th style="width: 12%; text-align: center;">Cant.</th>
+          <th style="width: 18%; text-align: right;">P. Unit.</th>
+          <th style="width: 18%; text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${nuevosProductosHTML}
+        <tr class="subtotal-row">
+          <td colspan="3" style="text-align: right;">SUBTOTAL PRODUCTOS ENTREGADOS:</td>
+          <td style="text-align: center;">${totalNuevosUnidades}</td>
+          <td></td>
+          <td style="text-align: right;">Bs. ${totalNuevosValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Nuevo Saldo Total -->
+    <div class="section-title page-break-before">
+      <span class="icon">✅</span>
+      NUEVO SALDO TOTAL (${totalNuevoSaldoUnidades} unidades)
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 35px; text-align: center;">N°</th>
+          <th style="width: 25%;">Marca</th>
+          <th style="width: 18%;">Amperaje</th>
+          <th style="width: 12%; text-align: center;">Cant.</th>
+          <th style="width: 18%; text-align: right;">P. Unit.</th>
+          <th style="width: 18%; text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${nuevoSaldoHTML}
+        <tr class="subtotal-row" style="background: #c8e6c9 !important;">
+          <td colspan="3" style="text-align: right; font-size: 10pt;">TOTAL NUEVO SALDO:</td>
+          <td style="text-align: center; font-size: 11pt;">${totalNuevoSaldoUnidades}</td>
+          <td></td>
+          <td style="text-align: right; font-size: 11pt;">Bs. ${totalNuevoSaldoValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Resumen de Totales -->
+    <div class="grand-total-section page-break">
+      <div class="grand-total-grid">
+        <div class="grand-total-box anterior">
+          <div class="grand-total-label">Saldo Anterior</div>
+          <div class="grand-total-value">Bs. ${totalSaldoAnteriorValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div>
+          <div class="grand-total-units">${totalSaldoAnteriorUnidades} unidades</div>
+        </div>
+        <div class="grand-total-box nuevos">
+          <div class="grand-total-label">+ Productos Entregados</div>
+          <div class="grand-total-value">Bs. ${totalNuevosValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div>
+          <div class="grand-total-units">${totalNuevosUnidades} unidades</div>
+        </div>
+        <div class="grand-total-box total">
+          <div class="grand-total-label">= Nuevo Saldo Total</div>
+          <div class="grand-total-value">Bs. ${totalNuevoSaldoValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div>
+          <div class="grand-total-units">${totalNuevoSaldoUnidades} unidades</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firmas -->
+    <div class="signature-section page-break">
+      <div class="signature-box">
+        <div class="signature-line">
+          <div class="signature-label">Entregado por</div>
+        </div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line">
+          <div class="signature-label">Recibido por: ${tienda.encargado || ''}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-company">${cfg.pie_empresa || cfg.nombre}</div>
+      <div class="footer-thanks">${cfg.pie_agradecimiento || '¡Gracias por su confianza!'}</div>
+      <div class="footer-contact">${cfg.pie_contacto || (telefonos ? `Para consultas: ${telefonos}${cfg.email ? ' | ' + cfg.email : ''}` : '')}</div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  };
+
+  // Imprimir resumen de envío después de confirmar
+  const handlePrintResumenEnvio = () => {
+    if (!lastConfirmedEnvio) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = generateResumenEnvioPDFHTML(
+      lastConfirmedEnvio.envio,
+      lastConfirmedEnvio.items,
+      lastConfirmedEnvio.tienda,
+      lastConfirmedEnvio.saldoAnterior
+    );
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+    
+    setPrintConfirmDialogOpen(false);
+    setLastConfirmedEnvio(null);
   };
 
   // Analizar archivo de saldos anteriores
@@ -2388,6 +2993,55 @@ export default function TiendasPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteEnvio} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Confirmar Cancelación
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Imprimir Resumen de Envío */}
+      <AlertDialog open={printConfirmDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setPrintConfirmDialogOpen(false);
+          setLastConfirmedEnvio(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5 text-primary" />
+              ¡Envío Confirmado!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>Los productos han sido agregados exitosamente al inventario de <strong>{lastConfirmedEnvio?.tienda.nombre}</strong>.</p>
+              
+              <div className="bg-muted rounded-lg p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Saldo anterior:</span>
+                  <span className="font-medium">{lastConfirmedEnvio?.saldoAnterior.reduce((s, p) => s + p.cantidad, 0) || 0} unidades</span>
+                </div>
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>+ Productos entregados:</span>
+                  <span className="font-medium">{lastConfirmedEnvio?.items.reduce((s, p) => s + p.cantidad, 0) || 0} unidades</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between text-sm font-bold">
+                  <span>= Nuevo saldo total:</span>
+                  <span>
+                    {(lastConfirmedEnvio?.saldoAnterior.reduce((s, p) => s + p.cantidad, 0) || 0) + 
+                     (lastConfirmedEnvio?.items.reduce((s, p) => s + p.cantidad, 0) || 0)} unidades
+                  </span>
+                </div>
+              </div>
+              
+              <p className="text-muted-foreground">¿Desea imprimir el resumen del envío con el saldo anterior y los nuevos productos?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPrintConfirmDialogOpen(false); setLastConfirmedEnvio(null); }}>
+              No, gracias
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handlePrintResumenEnvio} className="gap-2">
+              <Printer className="h-4 w-4" />
+              Imprimir Resumen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

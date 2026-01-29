@@ -15,9 +15,24 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const marca = searchParams.get('marca') || '';
     const amperaje = searchParams.get('amperaje') || '';
+    const noPagination = searchParams.get('noPagination') === 'true';
 
     if (!tiendaId) {
       return NextResponse.json({ error: 'tiendaId requerido' }, { status: 400 });
+    }
+
+    // Si noPagination, traer todos los items sin paginación
+    if (noPagination) {
+      const { data: items, error } = await supabase
+        .from('tienda_inventario')
+        .select('id, tienda_id, marca, amperaje, cantidad, costo, precio_venta')
+        .eq('tienda_id', tiendaId)
+        .order('marca')
+        .order('amperaje');
+
+      if (error) throw error;
+
+      return NextResponse.json({ items: items || [] });
     }
 
     const offset = (page - 1) * limit;
