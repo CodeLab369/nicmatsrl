@@ -5,7 +5,7 @@ import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
   Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download,
-  Upload, FileSpreadsheet, Clock, Check, AlertCircle
+  Upload, FileSpreadsheet, Clock, Check, AlertCircle, Printer, Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -90,6 +90,39 @@ interface EnvioItem {
   precio_tienda: number | null;
 }
 
+interface EmpresaConfig {
+  id?: string;
+  nombre: string;
+  nit: string;
+  direccion: string;
+  ciudad: string;
+  telefono_principal: string;
+  telefono_secundario: string;
+  telefono_adicional: string;
+  email: string;
+  logo: string | null;
+  color_principal: string;
+  pie_empresa: string;
+  pie_agradecimiento: string;
+  pie_contacto: string;
+}
+
+const defaultEmpresaConfig: EmpresaConfig = {
+  nombre: 'NICMAT S.R.L.',
+  nit: '',
+  direccion: '',
+  ciudad: 'Bolivia',
+  telefono_principal: '',
+  telefono_secundario: '',
+  telefono_adicional: '',
+  email: '',
+  logo: null,
+  color_principal: '#1a5f7a',
+  pie_empresa: 'NICMAT S.R.L.',
+  pie_agradecimiento: '',
+  pie_contacto: ''
+};
+
 export default function TiendasPage() {
   // Estados principales
   const [tiendas, setTiendas] = useState<Tienda[]>([]);
@@ -169,6 +202,12 @@ export default function TiendasPage() {
   const [isAnalyzingSaldos, setIsAnalyzingSaldos] = useState(false);
   const [isImportingSaldos, setIsImportingSaldos] = useState(false);
   const [saldosFile, setSaldosFile] = useState<File | null>(null);
+  
+  // Configuración de empresa para PDF
+  const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(defaultEmpresaConfig);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configForm, setConfigForm] = useState<EmpresaConfig>(defaultEmpresaConfig);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
   
   const { toast } = useToast();
 
@@ -285,10 +324,25 @@ export default function TiendasPage() {
     }
   }, []);
 
+  // Fetch configuración de empresa para PDF
+  const fetchEmpresaConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/empresa-config');
+      const data = await response.json();
+      if (data.config) {
+        setEmpresaConfig(data.config);
+        setConfigForm(data.config);
+      }
+    } catch (error) {
+      console.error('Error fetching empresa config:', error);
+    }
+  }, []);
+
   // Effects
   useEffect(() => {
     fetchTiendas();
-  }, [fetchTiendas]);
+    fetchEmpresaConfig();
+  }, [fetchTiendas, fetchEmpresaConfig]);
 
   useEffect(() => {
     if (selectedTienda) {
@@ -725,6 +779,450 @@ export default function TiendasPage() {
     }
   };
 
+  // Guardar configuración de empresa
+  const handleSaveConfig = async () => {
+    try {
+      setIsSavingConfig(true);
+      const response = await fetch('/api/empresa-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configForm)
+      });
+
+      if (!response.ok) throw new Error();
+
+      setEmpresaConfig(configForm);
+      setConfigDialogOpen(false);
+      toast({ title: 'Configuración guardada', variant: 'success' });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' });
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  // Imprimir/PDF de envío
+  const handlePrintEnvio = (envio: TiendaEnvio, items: EnvioItem[], tienda: Tienda) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = generateEnvioPDFHTML(envio, items, tienda);
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
+
+  // Generar HTML para PDF de envío
+  const generateEnvioPDFHTML = (envio: TiendaEnvio, items: EnvioItem[], tienda: Tienda) => {
+    const fechaFormat = new Date(envio.created_at).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    const cfg = empresaConfig;
+    const colorPrincipal = cfg.color_principal || '#1a5f7a';
+    
+    function adjustColor(color: string, amount: number): string {
+      const hex = color.replace('#', '');
+      const r = Math.min(255, parseInt(hex.substring(0, 2), 16) + amount);
+      const g = Math.min(255, parseInt(hex.substring(2, 4), 16) + amount);
+      const b = Math.min(255, parseInt(hex.substring(4, 6), 16) + amount);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
+    const gradiente = `linear-gradient(135deg, ${colorPrincipal} 0%, ${adjustColor(colorPrincipal, 40)} 100%)`;
+    
+    const logoHTML = cfg.logo 
+      ? `<img src="${cfg.logo}" alt="Logo" style="width: 70px; height: 70px; object-fit: contain; border-radius: 8px;">`
+      : `<div class="company-logo-placeholder">${cfg.nombre.substring(0, 2).toUpperCase()}</div>`;
+    
+    const telefonos = [cfg.telefono_principal, cfg.telefono_secundario, cfg.telefono_adicional].filter(Boolean).join(' | ');
+
+    // Calcular totales
+    const totalCosto = items.reduce((sum, p) => sum + (p.costo_original * p.cantidad), 0);
+    const totalVenta = items.reduce((sum, p) => sum + ((p.precio_tienda || p.precio_venta_original) * p.cantidad), 0);
+    
+    const productosHTML = items.map((p, i) => `
+      <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef; font-weight: 500;">${p.marca}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${p.amperaje}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: center;">${p.cantidad}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${(p.precio_tienda || p.precio_venta_original).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 600;">Bs. ${((p.precio_tienda || p.precio_venta_original) * p.cantidad).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Envío ${tienda.nombre} - ${fechaFormat}</title>
+  <style>
+    :root {
+      --color-principal: ${colorPrincipal};
+      --gradiente: ${gradiente};
+    }
+    @page {
+      size: letter;
+      margin: 10mm;
+    }
+    @media print {
+      html, body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 11pt;
+      color: #333;
+      line-height: 1.5;
+      background: white;
+    }
+    .container {
+      max-width: 100%;
+      padding: 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 25px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid var(--color-principal);
+    }
+    .company-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex: 1;
+    }
+    .company-logo-placeholder {
+      width: 70px;
+      height: 70px;
+      background: var(--gradiente);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 28px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .company-text {
+      flex: 1;
+    }
+    .company-name {
+      font-size: 24pt;
+      font-weight: 700;
+      color: var(--color-principal);
+      margin-bottom: 5px;
+    }
+    .company-details {
+      font-size: 9pt;
+      color: #666;
+      line-height: 1.6;
+    }
+    .doc-info {
+      text-align: right;
+    }
+    .doc-title {
+      background: var(--gradiente);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14pt;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .doc-date {
+      font-size: 10pt;
+      color: #666;
+    }
+    .title {
+      text-align: center;
+      font-size: 20pt;
+      font-weight: 700;
+      color: var(--color-principal);
+      margin: 25px 0;
+      letter-spacing: 3px;
+    }
+    .tienda-box {
+      background: #f8f9fa;
+      border-left: 4px solid var(--color-principal);
+      padding: 15px 20px;
+      margin-bottom: 25px;
+      border-radius: 0 8px 8px 0;
+    }
+    .tienda-title {
+      font-size: 10pt;
+      font-weight: 600;
+      color: var(--color-principal);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .tienda-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 30px;
+    }
+    .tienda-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10pt;
+    }
+    .tienda-item label {
+      font-weight: 600;
+      color: var(--color-principal);
+      white-space: nowrap;
+    }
+    .tienda-item label::after {
+      content: ':';
+    }
+    .tienda-item span {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th {
+      background: var(--gradiente);
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-size: 9pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    th:first-child { border-radius: 8px 0 0 0; }
+    th:last-child { border-radius: 0 8px 0 0; text-align: right; }
+    th:nth-child(4), th:nth-child(5) { text-align: center; }
+    td {
+      font-size: 10pt;
+    }
+    .totals-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 20px;
+    }
+    .totals-box {
+      width: 280px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 15px;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .total-row:last-child {
+      border-bottom: none;
+    }
+    .total-row.highlight {
+      background: var(--gradiente);
+      color: white;
+    }
+    .total-label {
+      font-size: 10pt;
+      color: #666;
+    }
+    .total-value {
+      font-size: 10pt;
+      font-weight: 600;
+    }
+    .total-row.highlight .total-label,
+    .total-row.highlight .total-value {
+      color: white;
+      font-size: 12pt;
+    }
+    .signature-section {
+      margin-top: 50px;
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+    }
+    .signature-box {
+      flex: 1;
+      text-align: center;
+    }
+    .signature-line {
+      border-top: 1px solid #333;
+      padding-top: 8px;
+      margin-top: 50px;
+    }
+    .signature-label {
+      font-size: 10pt;
+      color: #666;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 20px;
+      border-top: 2px solid #e9ecef;
+      margin-top: 30px;
+    }
+    .footer-company {
+      font-size: 12pt;
+      font-weight: 600;
+      color: var(--color-principal);
+    }
+    .footer-thanks {
+      font-size: 10pt;
+      color: #666;
+      margin: 5px 0;
+    }
+    .footer-contact {
+      font-size: 9pt;
+      color: #888;
+    }
+    .page-break {
+      page-break-inside: avoid;
+    }
+    table {
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    tbody {
+      page-break-inside: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="company-info">
+        ${logoHTML}
+        <div class="company-text">
+          <div class="company-name">${cfg.nombre}</div>
+          <div class="company-details">
+            ${cfg.nit ? `NIT: ${cfg.nit}<br>` : ''}
+            ${cfg.direccion ? `${cfg.direccion}<br>` : ''}
+            ${cfg.ciudad ? `${cfg.ciudad}<br>` : ''}
+            ${telefonos ? `Tel: ${telefonos}<br>` : ''}
+            ${cfg.email || ''}
+          </div>
+        </div>
+      </div>
+      <div class="doc-info">
+        <div class="doc-title">ENVÍO DE PRODUCTOS</div>
+        <div class="doc-date">
+          <strong>Fecha:</strong> ${fechaFormat}
+        </div>
+      </div>
+    </div>
+
+    <!-- Título -->
+    <div class="title">NOTA DE ENVÍO</div>
+
+    <!-- Datos de la tienda -->
+    <div class="tienda-box page-break">
+      <div class="tienda-title">Datos del Destino</div>
+      <div class="tienda-grid">
+        <div class="tienda-item">
+          <label>Tienda</label>
+          <span>${tienda.nombre}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Tipo</label>
+          <span>${tienda.tipo === 'sucursal' ? 'Sucursal' : 'Distribuidor'}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Encargado</label>
+          <span>${tienda.encargado || '-'}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Ciudad</label>
+          <span>${tienda.ciudad || '-'}</span>
+        </div>
+        <div class="tienda-item" style="grid-column: span 2;">
+          <label>Dirección</label>
+          <span>${tienda.direccion || '-'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de productos -->
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40px; text-align: center;">N°</th>
+          <th style="width: 25%;">Marca</th>
+          <th style="width: 20%;">Amperaje</th>
+          <th style="width: 12%; text-align: center;">Cant.</th>
+          <th style="width: 18%; text-align: right;">P. Unit.</th>
+          <th style="width: 18%; text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${productosHTML}
+      </tbody>
+    </table>
+
+    <!-- Totales -->
+    <div class="totals-container page-break">
+      <div class="totals-box">
+        <div class="total-row">
+          <span class="total-label">Total Productos</span>
+          <span class="total-value">${envio.total_productos} tipos</span>
+        </div>
+        <div class="total-row">
+          <span class="total-label">Total Unidades</span>
+          <span class="total-value">${envio.total_unidades} baterías</span>
+        </div>
+        <div class="total-row highlight">
+          <span class="total-label">VALOR TOTAL</span>
+          <span class="total-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firmas -->
+    <div class="signature-section page-break">
+      <div class="signature-box">
+        <div class="signature-line">
+          <div class="signature-label">Entregado por</div>
+        </div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line">
+          <div class="signature-label">Recibido por</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer page-break">
+      <div class="footer-company">${cfg.pie_empresa || cfg.nombre}</div>
+      <div class="footer-thanks">${cfg.pie_agradecimiento || '¡Gracias por su confianza!'}</div>
+      <div class="footer-contact">${cfg.pie_contacto || (telefonos ? `Para consultas: ${telefonos}${cfg.email ? ' | ' + cfg.email : ''}` : '')}</div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  };
+
   // Analizar archivo de saldos anteriores
   const handleAnalyzeSaldos = async (file: File) => {
     if (!selectedTienda) return;
@@ -925,6 +1423,10 @@ export default function TiendasPage() {
             <RefreshCw className="h-3 w-3" />
             {isConnected ? 'Conectado' : 'Sin conexión'}
           </div>
+          <Button variant="outline" onClick={() => { setConfigForm(empresaConfig); setConfigDialogOpen(true); }}>
+            <Settings className="mr-2 h-4 w-4" />
+            Configurar PDF
+          </Button>
           <Button onClick={() => { setShowForm(!showForm); if (showForm) handleCancelForm(); }}>
             {showForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
             {showForm ? 'Cancelar' : 'Nueva Tienda'}
@@ -1810,6 +2312,15 @@ export default function TiendasPage() {
           </div>
 
           <DialogFooter className="mt-4 gap-2 flex-wrap">
+            <Button 
+              variant="outline" 
+              onClick={() => selectedEnvio && selectedTienda && handlePrintEnvio(selectedEnvio, envioItems, selectedTienda)} 
+              className="gap-2"
+              disabled={loadingEnvioItems || envioItems.length === 0}
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir PDF
+            </Button>
             <Button variant="outline" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-2">
               <Download className="h-4 w-4" />
               Exportar Excel
@@ -1972,6 +2483,189 @@ export default function TiendasPage() {
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Confirmar Importación
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Configuración de Empresa para PDF */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configuración del PDF
+            </DialogTitle>
+            <DialogDescription>
+              Personaliza la información que aparece en los PDFs de envío
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Datos de la empresa */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Datos de la Empresa</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nombre de la Empresa *</Label>
+                  <Input
+                    value={configForm.nombre}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, nombre: e.target.value }))}
+                    placeholder="NICMAT S.R.L."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>NIT</Label>
+                  <Input
+                    value={configForm.nit || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, nit: e.target.value }))}
+                    placeholder="1234567890"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dirección</Label>
+                  <Input
+                    value={configForm.direccion || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, direccion: e.target.value }))}
+                    placeholder="Av. Principal #123"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ciudad</Label>
+                  <Input
+                    value={configForm.ciudad || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, ciudad: e.target.value }))}
+                    placeholder="La Paz, Bolivia"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={configForm.email || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="info@empresa.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Color Principal</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      value={configForm.color_principal || '#1a5f7a'}
+                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
+                      className="w-14 h-10 p-1 cursor-pointer"
+                    />
+                    <Input
+                      value={configForm.color_principal || '#1a5f7a'}
+                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
+                      placeholder="#1a5f7a"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Teléfonos */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Teléfonos de Contacto</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Teléfono Principal</Label>
+                  <Input
+                    value={configForm.telefono_principal || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_principal: e.target.value }))}
+                    placeholder="77012345"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono Secundario</Label>
+                  <Input
+                    value={configForm.telefono_secundario || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_secundario: e.target.value }))}
+                    placeholder="77567890"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono Adicional</Label>
+                  <Input
+                    value={configForm.telefono_adicional || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_adicional: e.target.value }))}
+                    placeholder="2-2123456"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Logo */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Logo de la Empresa</h4>
+              <div className="flex items-start gap-4">
+                <div className="w-20 h-20 border rounded-lg flex items-center justify-center overflow-hidden bg-muted">
+                  {configForm.logo ? (
+                    <img src={configForm.logo} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Store className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>URL del Logo o Base64</Label>
+                  <Input
+                    value={configForm.logo || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, logo: e.target.value }))}
+                    placeholder="https://... o data:image/png;base64,..."
+                  />
+                  <p className="text-xs text-muted-foreground">Pega una URL de imagen o el código base64 de tu logo</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Pie de página */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Pie de Página del PDF</h4>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nombre en Pie de Página</Label>
+                  <Input
+                    value={configForm.pie_empresa || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_empresa: e.target.value }))}
+                    placeholder="NICMAT S.R.L. - Tu mejor opción en baterías"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Mensaje de Agradecimiento</Label>
+                  <Input
+                    value={configForm.pie_agradecimiento || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_agradecimiento: e.target.value }))}
+                    placeholder="¡Gracias por su confianza!"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Información de Contacto</Label>
+                  <Input
+                    value={configForm.pie_contacto || ''}
+                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_contacto: e.target.value }))}
+                    placeholder="Para consultas: 77012345 | info@empresa.com"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={isSavingConfig || !configForm.nombre.trim()}>
+              {isSavingConfig ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Configuración'
               )}
             </Button>
           </DialogFooter>
