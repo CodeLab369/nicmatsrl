@@ -12,6 +12,7 @@ const DEFAULT_PERMISSIONS = {
   inventario: true,
   tiendas: true,
   cotizaciones: true,
+  movimientos: true,
   estadisticas: true,
 };
 

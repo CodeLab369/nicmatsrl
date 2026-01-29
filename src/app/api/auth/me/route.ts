@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       inventario: false,
       tiendas: false,
       cotizaciones: false,
+      movimientos: false,
       estadisticas: false,
     };
 

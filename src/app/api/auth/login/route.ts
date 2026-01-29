@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       inventario: false,
       tiendas: false,
       cotizaciones: false,
+      movimientos: false,
       estadisticas: false,
     };
 

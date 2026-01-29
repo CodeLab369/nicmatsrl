@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Package, Store, FileText, BarChart3 } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserSchema, CreateUserFormData } from '@/lib/validations';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, USER_ROLES } from '@/lib/constants';
@@ -44,6 +44,7 @@ export function CreateUserDialog({
     inventario: true,
     tiendas: true,
     cotizaciones: true,
+    movimientos: true,
     estadisticas: true,
   });
   const { toast } = useToast();
@@ -121,7 +122,7 @@ export function CreateUserDialog({
 
   const handleClose = () => {
     reset();
-    setPermissions({ inventario: true, tiendas: true, cotizaciones: true, estadisticas: true });
+    setPermissions({ inventario: true, tiendas: true, cotizaciones: true, movimientos: true, estadisticas: true });
     onOpenChange(false);
   };
 
@@ -237,6 +238,23 @@ export function CreateUserDialog({
                 >
                   <FileText className="h-4 w-4 text-orange-500" />
                   Cotizaciones
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="perm-movimientos"
+                  checked={permissions.movimientos}
+                  onCheckedChange={(checked) =>
+                    setPermissions({ ...permissions, movimientos: !!checked })
+                  }
+                  disabled={isSubmitting}
+                />
+                <label
+                  htmlFor="perm-movimientos"
+                  className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
+                >
+                  <TrendingUp className="h-4 w-4 text-cyan-500" />
+                  Movimientos
                 </label>
               </div>
               <div className="flex items-center space-x-2">

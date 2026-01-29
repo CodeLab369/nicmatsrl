@@ -230,13 +230,15 @@ export default function DashboardPage() {
                   </div>
                 </Link>
               )}
-              <Link href="/dashboard/movimientos">
-                <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors cursor-pointer">
-                  <TrendingUp className="h-8 w-8 text-cyan-500 mb-2" />
-                  <span className="text-sm font-medium">Movimientos</span>
-                  <span className="text-xs text-muted-foreground">Control financiero</span>
-                </div>
-              </Link>
+              {user?.permissions?.movimientos && (
+                <Link href="/dashboard/movimientos">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors cursor-pointer">
+                    <TrendingUp className="h-8 w-8 text-cyan-500 mb-2" />
+                    <span className="text-sm font-medium">Movimientos</span>
+                    <span className="text-xs text-muted-foreground">Control financiero</span>
+                  </div>
+                </Link>
+              )}
               {user?.role === 'admin' && (
                 <Link href="/dashboard/admin/usuarios">
                   <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 transition-colors cursor-pointer">
