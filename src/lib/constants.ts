@@ -56,6 +56,9 @@ export const ROUTES = {
   // Tiendas
   STORES: '/dashboard/tiendas',
   
+  // Estadísticas
+  STATISTICS: '/dashboard/estadisticas',
+  
   // Movimientos (Control Financiero)
   MOVEMENTS: '/dashboard/movimientos',
 } as const;

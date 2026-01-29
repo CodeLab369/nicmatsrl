@@ -12,6 +12,7 @@ import {
   UserCog,
   Store,
   TrendingUp,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts';
@@ -72,6 +73,11 @@ const navigation: NavGroup[] = [
         title: 'Movimientos',
         href: ROUTES.MOVEMENTS,
         icon: TrendingUp,
+      },
+      {
+        title: 'Estadísticas',
+        href: ROUTES.STATISTICS,
+        icon: BarChart3,
       },
     ],
   },
