@@ -7,6 +7,7 @@ import {
   Receipt, Wallet, PiggyBank, BarChart3, Filter, Search, X, ShoppingCart
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
@@ -308,6 +309,12 @@ export default function MovimientosPage() {
   useEffect(() => {
     fetchResumen();
   }, [fetchResumen]);
+
+  // Realtime: actualizar cuando cambien ventas, gastos o cotizaciones
+  useTableSubscription('tienda_ventas', fetchResumen);
+  useTableSubscription('tienda_gastos', fetchResumen);
+  useTableSubscription('cotizaciones', fetchResumen);
+  useTableSubscription('tienda_inventario', fetchResumen);
 
   useEffect(() => {
     if (selectedTienda) {

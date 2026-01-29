@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/contexts';
+import { useAuth, useTableSubscription } from '@/contexts';
 import { COMPANY } from '@/lib/constants';
 import { formatDateTime, formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
@@ -89,6 +89,12 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  // Realtime: actualizar cuando cambien las tablas principales
+  useTableSubscription('inventory', fetchStats);
+  useTableSubscription('cotizaciones', fetchStats);
+  useTableSubscription('users', fetchStats);
+  useTableSubscription('tienda_ventas', fetchStats);
 
   const statsCards = [
     {

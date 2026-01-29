@@ -6,6 +6,7 @@ import {
   Calendar, RefreshCw, ChevronUp, ChevronDown, Minus, Award, Target, Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
@@ -106,6 +107,11 @@ export default function EstadisticasPage() {
       fetchEstadisticas();
     }
   }, [tipoEstadistica, periodo, fetchEstadisticas]);
+
+  // Realtime: actualizar cuando cambien ventas o tiendas
+  useTableSubscription('tienda_ventas', fetchEstadisticas);
+  useTableSubscription('tienda_inventario', fetchEstadisticas);
+  useTableSubscription('tiendas', fetchEstadisticas);
 
   // Obtener etiqueta del período
   const getPeriodoLabel = () => {
