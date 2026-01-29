@@ -163,6 +163,13 @@ export default function TiendasPage() {
   const [deleteEnvioDialogOpen, setDeleteEnvioDialogOpen] = useState(false);
   const [envioToDelete, setEnvioToDelete] = useState<TiendaEnvio | null>(null);
   
+  // Saldos anteriores
+  const [saldosDialogOpen, setSaldosDialogOpen] = useState(false);
+  const [saldosAnalysis, setSaldosAnalysis] = useState<any>(null);
+  const [isAnalyzingSaldos, setIsAnalyzingSaldos] = useState(false);
+  const [isImportingSaldos, setIsImportingSaldos] = useState(false);
+  const [saldosFile, setSaldosFile] = useState<File | null>(null);
+  
   const { toast } = useToast();
 
   // Fetch tiendas
@@ -718,6 +725,134 @@ export default function TiendasPage() {
     }
   };
 
+  // Analizar archivo de saldos anteriores
+  const handleAnalyzeSaldos = async (file: File) => {
+    if (!selectedTienda) return;
+
+    try {
+      setIsAnalyzingSaldos(true);
+      setSaldosFile(file);
+
+      const XLSX = await import('xlsx');
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(ws);
+
+      // Normalizar datos del Excel
+      const productos = jsonData.map((row: any) => ({
+        marca: row['Marca'] || row['marca'] || '',
+        amperaje: String(row['Amperaje'] || row['amperaje'] || ''),
+        cantidad: parseInt(row['Cantidad'] || row['cantidad'] || 0),
+        precio_venta: parseFloat(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0),
+      })).filter((p: any) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
+
+      if (productos.length === 0) {
+        toast({ 
+          title: 'Error', 
+          description: 'No se encontraron productos válidos en el archivo', 
+          variant: 'destructive' 
+        });
+        setSaldosFile(null);
+        setIsAnalyzingSaldos(false);
+        return;
+      }
+
+      // Analizar contra el inventario existente de la tienda
+      const response = await fetch('/api/tienda-inventario/saldos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tiendaId: selectedTienda.id,
+          productos,
+          mode: 'analyze'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error);
+
+      setSaldosAnalysis(result.analysis);
+      setSaldosDialogOpen(true);
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al analizar archivo', 
+        variant: 'destructive' 
+      });
+      setSaldosFile(null);
+    } finally {
+      setIsAnalyzingSaldos(false);
+    }
+  };
+
+  // Importar saldos anteriores
+  const handleImportSaldos = async () => {
+    if (!selectedTienda || !saldosFile) return;
+
+    try {
+      setIsImportingSaldos(true);
+
+      const XLSX = await import('xlsx');
+      const data = await saldosFile.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(ws);
+
+      const productos = jsonData.map((row: any) => ({
+        marca: row['Marca'] || row['marca'] || '',
+        amperaje: String(row['Amperaje'] || row['amperaje'] || ''),
+        cantidad: parseInt(row['Cantidad'] || row['cantidad'] || 0),
+        precio_venta: parseFloat(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0),
+      })).filter((p: any) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
+
+      const response = await fetch('/api/tienda-inventario/saldos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tiendaId: selectedTienda.id,
+          productos,
+          mode: 'import'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error);
+
+      toast({ 
+        title: 'Saldos importados', 
+        description: result.message, 
+        variant: 'success' 
+      });
+
+      setSaldosDialogOpen(false);
+      setSaldosAnalysis(null);
+      setSaldosFile(null);
+      fetchTiendaInventory();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al importar saldos', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsImportingSaldos(false);
+    }
+  };
+
+  // Descargar formato de saldos
+  const handleDownloadSaldosFormat = async () => {
+    const XLSX = await import('xlsx');
+    const headers = [['Marca', 'Amperaje', 'Cantidad', 'Precio de Venta']];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
+    ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Saldos');
+    XLSX.writeFile(wb, 'formato_saldos_anteriores.xlsx');
+  };
+
   // Helper para estado del envío
   const getEnvioEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -1032,6 +1167,29 @@ export default function TiendasPage() {
               </div>
               {selectedTienda && (
                 <div className="flex items-center gap-2">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAnalyzeSaldos(file);
+                        e.target.value = '';
+                      }}
+                      disabled={isAnalyzingSaldos}
+                    />
+                    <Button variant="outline" size="sm" className="gap-1.5" asChild disabled={isAnalyzingSaldos}>
+                      <span>
+                        {isAnalyzingSaldos ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        <span className="hidden xs:inline">Saldo Anterior</span>
+                      </span>
+                    </Button>
+                  </label>
                   <Button variant="outline" size="sm" onClick={handleExportTiendaInventory} className="gap-1.5" disabled={tiendaStats.totalProductos === 0}>
                     <Download className="h-4 w-4" />
                     <span className="hidden xs:inline">Exportar</span>
@@ -1719,6 +1877,102 @@ export default function TiendasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Saldos Anteriores */}
+      <Dialog open={saldosDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setSaldosDialogOpen(false);
+          setSaldosAnalysis(null);
+          setSaldosFile(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Importar Saldo Anterior
+            </DialogTitle>
+            <DialogDescription>
+              Carga el inventario existente de la tienda <strong>{selectedTienda?.nombre}</strong> antes de agregar nuevos productos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {saldosAnalysis && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold">{saldosAnalysis.total}</p>
+                  <p className="text-xs text-muted-foreground">Total en archivo</p>
+                </div>
+                <div className="text-center p-3 bg-green-500/10 rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">{saldosAnalysis.new}</p>
+                  <p className="text-xs text-muted-foreground">Nuevos</p>
+                </div>
+                <div className="text-center p-3 bg-blue-500/10 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">{saldosAnalysis.existing}</p>
+                  <p className="text-xs text-muted-foreground">Actualizar</p>
+                </div>
+              </div>
+
+              {saldosAnalysis.newItems.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Productos nuevos (muestra):</p>
+                  <div className="text-xs space-y-1 max-h-24 overflow-y-auto bg-muted/50 p-2 rounded">
+                    {saldosAnalysis.newItems.map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between">
+                        <span>{item.marca} {item.amperaje}</span>
+                        <span className="text-muted-foreground">{item.cantidad} u.</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {saldosAnalysis.updateItems.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Productos a actualizar (muestra):</p>
+                  <div className="text-xs space-y-1 max-h-24 overflow-y-auto bg-muted/50 p-2 rounded">
+                    {saldosAnalysis.updateItems.map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between">
+                        <span>{item.marca} {item.amperaje}</span>
+                        <span className="text-muted-foreground">+{item.cantidad} u.</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Los productos existentes sumarán las cantidades. Los precios se actualizarán con los del archivo.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleDownloadSaldosFormat} size="sm">
+              <Download className="h-4 w-4 mr-1" />
+              Formato
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => setSaldosDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleImportSaldos} disabled={isImportingSaldos || !saldosAnalysis}>
+              {isImportingSaldos ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirmar Importación
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
