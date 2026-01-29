@@ -4,6 +4,9 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
+// Log para verificar que el módulo se carga
+console.log('%c📦 REALTIME-CONTEXT.TSX CARGADO', 'background: blue; color: white; font-size: 12px;');
+
 type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios' | 'tienda_ventas' | 'tienda_gastos';
 type Callback = () => void;
 
@@ -38,14 +41,17 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // LOG MUY VISIBLE para confirmar que el provider se monta
+    console.log('%c🚀 REALTIME PROVIDER MONTADO', 'background: #00ff00; color: black; font-size: 16px; padding: 4px;');
+    
     const supabase = createBrowserClient();
     
-    console.log('🔌 [Realtime] Iniciando conexión WebSocket...');
+    console.log('%c🔌 [Realtime] Iniciando conexión WebSocket...', 'color: cyan; font-weight: bold;');
     console.log('🔗 [Realtime] URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 
     // Handler genérico para cambios en tablas
     const handleChange = (table: TableName) => (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-      console.log(`✨ [Realtime] ¡CAMBIO DETECTADO en ${table}!`, {
+      console.log(`%c✨ [Realtime] ¡CAMBIO DETECTADO en ${table}!`, 'background: yellow; color: black; font-size: 14px; padding: 2px;', {
         event: payload.eventType,
         new: payload.new,
         old: payload.old
@@ -82,17 +88,19 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, handleChange('user_presence'));
 
     // Suscribirse al canal
+    console.log('%c📡 [Realtime] Intentando suscribirse al canal...', 'color: orange;');
+    
     channel.subscribe((status, err) => {
-      console.log('📡 [Realtime] Estado:', status, err ? `Error: ${err.message}` : '');
+      console.log('%c📡 [Realtime] Estado del canal:', 'color: orange; font-weight: bold;', status, err ? `Error: ${err.message}` : '');
       setConnectionStatus(status);
       setIsConnected(status === 'SUBSCRIBED');
       
       if (status === 'SUBSCRIBED') {
-        console.log('✅ [Realtime] ¡Conectado! Escuchando cambios en tiempo real...');
+        console.log('%c✅ [Realtime] ¡CONECTADO! Escuchando cambios en tiempo real...', 'background: green; color: white; font-size: 14px; padding: 4px;');
       }
       
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.log('⚠️ [Realtime] Error de conexión, reintentando en 3s...');
+        console.log('%c⚠️ [Realtime] Error de conexión, reintentando en 3s...', 'background: red; color: white;');
         reconnectTimeoutRef.current = setTimeout(() => {
           console.log('🔄 [Realtime] Reintentando conexión...');
           channel.subscribe();
