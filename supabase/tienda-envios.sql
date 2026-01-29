@@ -49,9 +49,12 @@ CREATE POLICY "service_role_all_tienda_envio_items" ON tienda_envio_items
 -- 6. Habilitar Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE tienda_envios;
 
--- 7. Función para actualizar updated_at
+-- 7. Función para actualizar updated_at (con search_path seguro)
 CREATE OR REPLACE FUNCTION update_tienda_envios_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
