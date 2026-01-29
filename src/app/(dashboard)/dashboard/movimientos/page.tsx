@@ -284,19 +284,24 @@ export default function MovimientosPage() {
     }
   };
 
-  // Fetch detalle de venta
-  const fetchVentaDetail = async (ventaId: string) => {
-    try {
-      setLoadingVentaDetail(true);
-      const response = await fetch(`/api/tienda-ventas?ventaId=${ventaId}`);
-      const data = await response.json();
-      setSelectedVenta(data.venta);
-      setVentaItems(data.items || []);
+  // Fetch detalle de venta - usa datos locales si están disponibles para respuesta instantánea
+  const fetchVentaDetail = (ventaId: string) => {
+    const ventaLocal = ventas.find(v => v.id === ventaId);
+    if (ventaLocal && ventaLocal.items) {
+      setSelectedVenta(ventaLocal);
+      setVentaItems(ventaLocal.items);
       setVentaDetailOpen(true);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoadingVentaDetail(false);
+    } else {
+      // Fallback a API si no hay datos locales
+      setLoadingVentaDetail(true);
+      fetch(`/api/tienda-ventas?ventaId=${ventaId}`)
+        .then(res => res.json())
+        .then(data => {
+          setSelectedVenta(data.venta);
+          setVentaItems(data.items || []);
+          setVentaDetailOpen(true);
+        })
+        .finally(() => setLoadingVentaDetail(false));
     }
   };
 
@@ -556,60 +561,60 @@ export default function MovimientosPage() {
       ) : (
         <>
           {/* Resumen General */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ingresos Totales</p>
-                    <p className="text-2xl font-bold">{formatCurrency(resumen?.general.ingresosTotales || 0)}</p>
+              <CardContent className="p-3 md:pt-6 md:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">Ingresos Totales</p>
+                    <p className="text-lg md:text-2xl font-bold truncate">{formatCurrency(resumen?.general.ingresosTotales || 0)}</p>
                   </div>
-                  <div className="h-12 w-12 bg-green-500/10 rounded-full flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
+                  <div className="h-8 w-8 md:h-12 md:w-12 bg-green-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <DollarSign className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ganancia Bruta</p>
-                    <p className="text-2xl font-bold">{formatCurrency(resumen?.general.gananciaBruta || 0)}</p>
+              <CardContent className="p-3 md:pt-6 md:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">Ganancia Bruta</p>
+                    <p className="text-lg md:text-2xl font-bold truncate">{formatCurrency(resumen?.general.gananciaBruta || 0)}</p>
                   </div>
-                  <div className="h-12 w-12 bg-blue-500/10 rounded-full flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Gastos Totales</p>
-                    <p className="text-2xl font-bold">{formatCurrency(resumen?.general.gastosTotales || 0)}</p>
-                  </div>
-                  <div className="h-12 w-12 bg-red-500/10 rounded-full flex items-center justify-center">
-                    <TrendingDown className="h-6 w-6 text-red-600" />
+                  <div className="h-8 w-8 md:h-12 md:w-12 bg-blue-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <TrendingUp className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ganancia Neta</p>
-                    <p className={`text-2xl font-bold ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <CardContent className="p-3 md:pt-6 md:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">Gastos Totales</p>
+                    <p className="text-lg md:text-2xl font-bold text-red-600 truncate">{formatCurrency(resumen?.general.gastosTotales || 0)}</p>
+                  </div>
+                  <div className="h-8 w-8 md:h-12 md:w-12 bg-red-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <TrendingDown className="h-4 w-4 md:h-6 md:w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 md:pt-6 md:px-6">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">Ganancia Neta</p>
+                    <p className={`text-lg md:text-2xl font-bold truncate ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(resumen?.general.gananciaNeta || 0)}
                     </p>
                   </div>
-                  <div className={`h-12 w-12 ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} rounded-full flex items-center justify-center`}>
-                    <PiggyBank className={`h-6 w-6 ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+                  <div className={`h-8 w-8 md:h-12 md:w-12 ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} rounded-full flex items-center justify-center flex-shrink-0`}>
+                    <PiggyBank className={`h-4 w-4 md:h-6 md:w-6 ${(resumen?.general.gananciaNeta || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                   </div>
                 </div>
               </CardContent>
@@ -740,7 +745,7 @@ export default function MovimientosPage() {
               ) : (
                 <div className="space-y-4">
                   {/* Header de tienda seleccionada */}
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg">
                     <div>
                       <h3 className="text-lg font-semibold flex items-center gap-2">
                         <Store className="h-5 w-5" />
@@ -753,13 +758,13 @@ export default function MovimientosPage() {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={handleOpenRegistrarVenta} className="gap-2">
+                      <Button onClick={handleOpenRegistrarVenta} size="sm" className="gap-1 flex-1 sm:flex-none">
                         <ShoppingCart className="h-4 w-4" />
-                        Registrar Venta
+                        <span className="hidden xs:inline">Registrar</span> Venta
                       </Button>
-                      <Button variant="outline" onClick={handleOpenAgregarGasto} className="gap-2">
+                      <Button variant="outline" onClick={handleOpenAgregarGasto} size="sm" className="gap-1 flex-1 sm:flex-none">
                         <Plus className="h-4 w-4" />
-                        Agregar Gasto
+                        <span className="hidden xs:inline">Agregar</span> Gasto
                       </Button>
                     </div>
                   </div>
@@ -818,28 +823,30 @@ export default function MovimientosPage() {
                               </div>
                               {/* Tabla de productos */}
                               {venta.items && venta.items.length > 0 && (
-                                <table className="w-full text-sm">
-                                  <thead className="bg-muted/50">
-                                    <tr>
-                                      <th className="text-left py-2 px-3 font-medium">Marca</th>
-                                      <th className="text-left py-2 px-3 font-medium">Amperaje</th>
-                                      <th className="text-center py-2 px-3 font-medium">Cant.</th>
-                                      <th className="text-right py-2 px-3 font-medium">Precio</th>
-                                      <th className="text-right py-2 px-3 font-medium">Subtotal</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {venta.items.map((item: { id: string; marca: string; amperaje: string; cantidad: number; precio_venta: number; subtotal: number }) => (
-                                      <tr key={item.id} className="border-t border-muted">
-                                        <td className="py-2 px-3 font-medium">{item.marca}</td>
-                                        <td className="py-2 px-3">{item.amperaje}</td>
-                                        <td className="py-2 px-3 text-center">{item.cantidad}</td>
-                                        <td className="py-2 px-3 text-right">{formatCurrency(item.precio_venta)}</td>
-                                        <td className="py-2 px-3 text-right font-medium">{formatCurrency(item.subtotal)}</td>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm min-w-[400px]">
+                                    <thead className="bg-muted/50">
+                                      <tr>
+                                        <th className="text-left py-2 px-2 md:px-3 font-medium">Marca</th>
+                                        <th className="text-left py-2 px-2 md:px-3 font-medium">Amperaje</th>
+                                        <th className="text-center py-2 px-2 md:px-3 font-medium">Cant.</th>
+                                        <th className="text-right py-2 px-2 md:px-3 font-medium">Precio</th>
+                                        <th className="text-right py-2 px-2 md:px-3 font-medium">Subtotal</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                    </thead>
+                                    <tbody>
+                                      {venta.items.map((item: { id: string; marca: string; amperaje: string; cantidad: number; precio_venta: number; subtotal: number }) => (
+                                        <tr key={item.id} className="border-t border-muted">
+                                          <td className="py-2 px-2 md:px-3 font-medium">{item.marca}</td>
+                                          <td className="py-2 px-2 md:px-3">{item.amperaje}</td>
+                                          <td className="py-2 px-2 md:px-3 text-center">{item.cantidad}</td>
+                                          <td className="py-2 px-2 md:px-3 text-right whitespace-nowrap">{formatCurrency(item.precio_venta)}</td>
+                                          <td className="py-2 px-2 md:px-3 text-right font-medium whitespace-nowrap">{formatCurrency(item.subtotal)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
                               )}
                               {venta.notas && (
                                 <div className="px-3 py-2 bg-muted/20 border-t text-sm text-muted-foreground">
