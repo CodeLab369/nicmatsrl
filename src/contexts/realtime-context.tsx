@@ -23,6 +23,7 @@ const subscribers: Record<TableName, Set<Callback>> = {
   tiendas: new Set(),
   tienda_inventario: new Set(),
   user_presence: new Set(),
+  tienda_envios: new Set(),
 };
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
