@@ -14,11 +14,11 @@ export async function GET(request: NextRequest) {
     const fechaHasta = searchParams.get('fechaHasta');
     const tiendaId = searchParams.get('tiendaId'); // Opcional, para filtrar por tienda específica
 
-    // 1. Obtener ventas de cotizaciones (estado = 'venta')
+    // 1. Obtener ventas de cotizaciones (estado = 'convertida')
     let cotizacionesQuery = supabase
       .from('cotizaciones')
       .select('total, ganancia, created_at')
-      .eq('estado', 'venta');
+      .eq('estado', 'convertida');
 
     if (fechaDesde) cotizacionesQuery = cotizacionesQuery.gte('created_at', `${fechaDesde}T00:00:00`);
     if (fechaHasta) cotizacionesQuery = cotizacionesQuery.lte('created_at', `${fechaHasta}T23:59:59`);
