@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     const offset = (page - 1) * limit;
+    const noPagination = searchParams.get('noPagination') === 'true';
 
     // Función para aplicar filtros a una query
     const applyFilters = (query: any, includeMinStock = false) => {
@@ -84,6 +85,30 @@ export async function GET(request: NextRequest) {
       }
       return query;
     };
+
+    // Si es consulta sin paginación (para transferencias masivas)
+    if (noPagination) {
+      let allQuery = supabase
+        .from('inventory')
+        .select('id, marca, amperaje, cantidad, costo, precio_venta');
+      
+      if (minStock) {
+        allQuery = allQuery.gte('cantidad', parseInt(minStock));
+      }
+      
+      const { data: allItems, error: allError } = await allQuery.order('marca');
+      
+      if (allError) throw allError;
+      
+      // Obtener marcas únicas directamente
+      const marcas = Array.from(new Set((allItems || []).map((i: { marca: string }) => i.marca))).sort();
+      
+      return NextResponse.json({
+        items: allItems || [],
+        total: (allItems || []).length,
+        marcas
+      });
+    }
 
     let query = supabase
       .from('inventory')

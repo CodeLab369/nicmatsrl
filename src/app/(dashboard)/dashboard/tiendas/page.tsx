@@ -148,6 +148,8 @@ export default function TiendasPage() {
   const [transferMarcas, setTransferMarcas] = useState<string[]>([]);
   const [loadingTransfer, setLoadingTransfer] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [transferPage, setTransferPage] = useState(1);
+  const TRANSFER_PAGE_SIZE = 50; // Mostrar 50 items por página en el diálogo de transferencia
   
   // Envíos pendientes
   const [enviosPendientes, setEnviosPendientes] = useState<TiendaEnvio[]>([]);
@@ -219,15 +221,15 @@ export default function TiendasPage() {
     }
   }, [selectedTienda, tiendaPage, tiendaLimit, tiendaFilterMarca, tiendaFilterAmperaje]);
 
-  // Fetch inventario central para transferencia (optimizado: solo campos necesarios)
+  // Fetch inventario central para transferencia (optimizado: sin paginación, todos los productos con stock)
   const fetchInventarioCentral = useCallback(async () => {
     try {
       setLoadingTransfer(true);
-      // Solo obtener items con stock disponible y campos necesarios
-      const response = await fetch('/api/inventory?limit=2000&fields=id,marca,amperaje,cantidad,costo,precio_venta&minStock=1');
+      // Endpoint optimizado: trae todos los productos con stock >= 1 sin paginación
+      const response = await fetch('/api/inventory?noPagination=true&minStock=1');
       const data = await response.json();
       
-      const items = (data.items || []).filter((i: InventoryItem) => i.cantidad > 0);
+      const items = data.items || [];
       setInventarioCentral(items);
       
       // Inicializar items de transferencia
@@ -237,9 +239,8 @@ export default function TiendasPage() {
         selected: false
       })));
       
-      // Obtener marcas únicas
-      const marcas = Array.from(new Set(items.map((i: InventoryItem) => i.marca))).sort() as string[];
-      setTransferMarcas(marcas);
+      // Usar marcas del servidor (ya viene calculado)
+      setTransferMarcas(data.marcas || []);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -746,6 +747,21 @@ export default function TiendasPage() {
   const totalUnidadesAEnviar = useMemo(() => 
     transferItems.reduce((sum, i) => sum + (i.selected ? i.cantidadEnviar : 0), 0)
   , [transferItems]);
+
+  // Paginación de items filtrados para renderizado eficiente
+  const paginatedTransferItems = useMemo(() => {
+    const start = (transferPage - 1) * TRANSFER_PAGE_SIZE;
+    return filteredTransferItems.slice(start, start + TRANSFER_PAGE_SIZE);
+  }, [filteredTransferItems, transferPage]);
+
+  const transferTotalPages = useMemo(() => 
+    Math.ceil(filteredTransferItems.length / TRANSFER_PAGE_SIZE)
+  , [filteredTransferItems.length]);
+
+  // Reset página cuando cambian filtros
+  useEffect(() => {
+    setTransferPage(1);
+  }, [transferSearch, transferFilterMarca]);
 
   // Badge tipo tienda
   const getTipoBadge = (tipo: string) => {
@@ -1338,7 +1354,7 @@ export default function TiendasPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransferItems.map((item) => (
+                    {paginatedTransferItems.map((item) => (
                       <tr key={item.id} className={`border-b hover:bg-muted/50 ${item.selected ? 'bg-primary/5' : ''}`}>
                         <td className="py-3 px-4">
                           <Checkbox
@@ -1397,6 +1413,56 @@ export default function TiendasPage() {
                 </table>
               )}
             </div>
+            
+            {/* Paginación de transferencia */}
+            {filteredTransferItems.length > TRANSFER_PAGE_SIZE && (
+              <div className="flex items-center justify-between py-2 px-1 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Mostrando {((transferPage - 1) * TRANSFER_PAGE_SIZE) + 1}-{Math.min(transferPage * TRANSFER_PAGE_SIZE, filteredTransferItems.length)} de {filteredTransferItems.length} productos
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setTransferPage(1)}
+                    disabled={transferPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4 -ml-2" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setTransferPage(p => Math.max(1, p - 1))}
+                    disabled={transferPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm px-2">{transferPage} / {transferTotalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setTransferPage(p => Math.min(transferTotalPages, p + 1))}
+                    disabled={transferPage >= transferTotalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setTransferPage(transferTotalPages)}
+                    disabled={transferPage >= transferTotalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4 -ml-2" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-4">
