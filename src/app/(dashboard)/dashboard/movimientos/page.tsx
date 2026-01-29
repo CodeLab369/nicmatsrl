@@ -421,6 +421,7 @@ export default function MovimientosPage() {
   const handleOpenAgregarGasto = () => {
     setGastoForm({
       categoria: '',
+      categoriaOtro: '',
       descripcion: '',
       monto: '',
       fecha: new Date().toISOString().split('T')[0]
