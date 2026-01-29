@@ -1190,6 +1190,10 @@ export default function TiendasPage() {
                       </span>
                     </Button>
                   </label>
+                  <Button variant="ghost" size="sm" onClick={handleDownloadSaldosFormat} className="gap-1.5" title="Descargar formato de saldo anterior">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span className="hidden sm:inline">Formato</span>
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleExportTiendaInventory} className="gap-1.5" disabled={tiendaStats.totalProductos === 0}>
                     <Download className="h-4 w-4" />
                     <span className="hidden xs:inline">Exportar</span>
