@@ -10,6 +10,7 @@ type Callback = () => void;
 interface RealtimeContextType {
   isConnected: boolean;
   connectionStatus: string;
+  lastEvent: { table: string; type: string; time: Date } | null;
   subscribe: (table: TableName, callback: Callback) => () => void;
 }
 
@@ -29,47 +30,46 @@ const subscribers: Record<TableName, Set<Callback>> = {
   tienda_gastos: new Set(),
 };
 
-// Debug en desarrollo
-const isDev = process.env.NODE_ENV === 'development';
-const log = (...args: unknown[]) => {
-  if (isDev) console.log('[Realtime]', ...args);
-};
-
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('INITIALIZING');
+  const [lastEvent, setLastEvent] = useState<{ table: string; type: string; time: Date } | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const supabase = createBrowserClient();
     
-    log('🔌 Iniciando conexión Realtime...');
+    console.log('🔌 [Realtime] Iniciando conexión WebSocket...');
+    console.log('🔗 [Realtime] URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 
     // Handler genérico para cambios en tablas
     const handleChange = (table: TableName) => (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-      log(`📥 Cambio en ${table}:`, payload.eventType, payload);
+      console.log(`✨ [Realtime] ¡CAMBIO DETECTADO en ${table}!`, {
+        event: payload.eventType,
+        new: payload.new,
+        old: payload.old
+      });
+      
+      // Actualizar último evento
+      setLastEvent({ table, type: payload.eventType, time: new Date() });
+      
+      // Ejecutar todos los callbacks suscritos a esta tabla
       const callbacks = subscribers[table];
-      if (callbacks.size > 0) {
-        log(`🔄 Ejecutando ${callbacks.size} callbacks para ${table}`);
-        callbacks.forEach(cb => {
-          try {
-            cb();
-          } catch (err) {
-            console.error(`Error en callback de ${table}:`, err);
-          }
-        });
-      }
+      console.log(`📢 [Realtime] Ejecutando ${callbacks.size} callbacks para ${table}`);
+      
+      callbacks.forEach(cb => {
+        try {
+          cb();
+        } catch (err) {
+          console.error(`❌ [Realtime] Error en callback de ${table}:`, err);
+        }
+      });
     };
     
     // Crear canal con todas las tablas
     const channel = supabase
-      .channel('db-changes', {
-        config: {
-          broadcast: { self: true },
-          presence: { key: '' },
-        }
-      })
+      .channel('db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, handleChange('inventory'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, handleChange('cotizaciones'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, handleChange('empresa_config'))
@@ -83,16 +83,20 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     // Suscribirse al canal
     channel.subscribe((status, err) => {
-      log('📡 Estado de conexión:', status, err ? `Error: ${err.message}` : '');
+      console.log('📡 [Realtime] Estado:', status, err ? `Error: ${err.message}` : '');
       setConnectionStatus(status);
       setIsConnected(status === 'SUBSCRIBED');
       
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ [Realtime] ¡Conectado! Escuchando cambios en tiempo real...');
+      }
+      
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        log('⚠️ Error de conexión, reintentando en 5s...');
+        console.log('⚠️ [Realtime] Error de conexión, reintentando en 3s...');
         reconnectTimeoutRef.current = setTimeout(() => {
-          log('🔄 Reintentando conexión...');
+          console.log('🔄 [Realtime] Reintentando conexión...');
           channel.subscribe();
-        }, 5000);
+        }, 3000);
       }
     });
 
@@ -100,7 +104,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     // Cleanup
     return () => {
-      log('🔌 Cerrando conexión Realtime...');
+      console.log('🔌 [Realtime] Cerrando conexión...');
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -114,15 +118,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   // Función para suscribirse a una tabla
   const subscribe = useCallback((table: TableName, callback: Callback): (() => void) => {
     subscribers[table].add(callback);
-    log(`✅ Suscrito a ${table}. Total: ${subscribers[table].size}`);
+    console.log(`📝 [Realtime] Suscrito a ${table}. Total suscriptores: ${subscribers[table].size}`);
     return () => {
       subscribers[table].delete(callback);
-      log(`❌ Desuscrito de ${table}. Total: ${subscribers[table].size}`);
+      console.log(`🗑️ [Realtime] Desuscrito de ${table}. Total suscriptores: ${subscribers[table].size}`);
     };
   }, []);
 
   return (
-    <RealtimeContext.Provider value={{ isConnected, connectionStatus, subscribe }}>
+    <RealtimeContext.Provider value={{ isConnected, connectionStatus, lastEvent, subscribe }}>
       {children}
     </RealtimeContext.Provider>
   );
@@ -147,13 +151,17 @@ export function useTableSubscription(table: TableName, callback: Callback) {
   }, [callback]);
 
   useEffect(() => {
-    log(`🎯 useTableSubscription: Registrando para ${table}`);
-    const unsubscribe = subscribe(table, () => {
-      log(`🎯 useTableSubscription: Ejecutando callback de ${table}`);
+    console.log(`🎯 [useTableSubscription] Registrando callback para: ${table}`);
+    
+    const wrappedCallback = () => {
+      console.log(`🎯 [useTableSubscription] ¡Callback ejecutado para ${table}!`);
       callbackRef.current();
-    });
+    };
+    
+    const unsubscribe = subscribe(table, wrappedCallback);
+    
     return () => {
-      log(`🎯 useTableSubscription: Limpiando ${table}`);
+      console.log(`🎯 [useTableSubscription] Limpiando suscripción de: ${table}`);
       unsubscribe();
     };
   }, [table, subscribe]);
