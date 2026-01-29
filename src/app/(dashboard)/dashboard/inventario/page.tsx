@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
@@ -128,13 +128,15 @@ export default function InventarioPage() {
     setFilterAmperaje('_all'); // Reset amperaje cuando cambia la marca
   }, [filterMarca, fetchAmperajes]);
 
-  // Cargar inventario
-  const fetchInventory = useCallback(async () => {
+  // Cargar inventario (showLoading=false para actualizaciones silenciosas de Realtime)
+  const fetchInventory = useCallback(async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
+        // Timestamp para evitar caché en actualizaciones Realtime
+        _t: Date.now().toString(),
       });
       if (search) params.set('search', search);
       if (filterMarca && filterMarca !== '_all') params.set('marca', filterMarca);
@@ -144,10 +146,12 @@ export default function InventarioPage() {
         params.set('cantidadVal', cantidadVal);
       }
 
+      console.log('📦 [Inventario] Cargando datos...', { showLoading, page, limit });
       const response = await fetch(`/api/inventory?${params}`);
       const data = await response.json();
 
       if (data.items) {
+        console.log('✅ [Inventario] Datos recibidos:', data.items.length, 'items');
         setItems(data.items);
         setTotal(data.total);
         setTotalPages(data.totalPages);
@@ -157,18 +161,32 @@ export default function InventarioPage() {
       console.error('Error:', error);
       toast({ title: 'Error', description: 'No se pudo cargar el inventario', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }, [page, limit, search, filterMarca, filterAmperaje, cantidadOp, cantidadVal, toast]);
+
+  // Ref para mantener la función actualizada
+  const fetchInventoryRef = useRef(fetchInventory);
+  const fetchMarcasRef = useRef(fetchMarcas);
+  
+  useEffect(() => {
+    fetchInventoryRef.current = fetchInventory;
+  }, [fetchInventory]);
+  
+  useEffect(() => {
+    fetchMarcasRef.current = fetchMarcas;
+  }, [fetchMarcas]);
 
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Suscripción a Realtime centralizada
+  // Suscripción a Realtime centralizada - actualización SILENCIOSA sin spinner
+  // Usa refs para siempre tener la versión más reciente de las funciones
   const isRealtime = useTableSubscription('inventory', () => {
-    fetchInventory();
-    fetchMarcas();
+    console.log('🔄 [Inventario] Realtime detectó cambio, actualizando sin spinner...');
+    fetchInventoryRef.current(false); // false = sin mostrar el icono de carga
+    fetchMarcasRef.current();
   });
 
   // Resetear página al cambiar filtros

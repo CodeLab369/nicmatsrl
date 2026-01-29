@@ -6,6 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Forzar que esta ruta sea dinámica y no se cachee
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET - Obtener configuración
 export async function GET() {
   try {

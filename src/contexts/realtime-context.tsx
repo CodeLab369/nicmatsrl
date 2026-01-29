@@ -145,16 +145,16 @@ export function useTableSubscription(table: TableName, callback: Callback) {
   const { isConnected, subscribe } = useRealtimeContext();
   const callbackRef = useRef(callback);
   
-  // Actualizar ref cuando cambie el callback
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback]);
+  // IMPORTANTE: Actualizar ref SIEMPRE que cambie el callback
+  // Esto asegura que cuando Realtime llame al callback, use la versión más reciente
+  callbackRef.current = callback;
 
   useEffect(() => {
     console.log(`🎯 [useTableSubscription] Registrando callback para: ${table}`);
     
     const wrappedCallback = () => {
-      console.log(`🎯 [useTableSubscription] ¡Callback ejecutado para ${table}!`);
+      console.log(`🎯 [useTableSubscription] ¡Ejecutando callback para ${table}!`);
+      // Siempre llama a la versión más reciente del callback
       callbackRef.current();
     };
     
