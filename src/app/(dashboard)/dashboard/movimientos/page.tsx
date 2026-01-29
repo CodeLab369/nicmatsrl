@@ -908,14 +908,14 @@ export default function MovimientosPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          <div className="flex-1 overflow-hidden flex flex-col gap-4 px-1">
             {/* Búsqueda y resumen */}
             <div className="flex items-center justify-between gap-4">
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar producto..."
-                  className="pl-9"
+                  className="pl-9 focus-visible:ring-offset-0"
                   value={ventaSearch}
                   onChange={(e) => setVentaSearch(e.target.value)}
                 />
@@ -1017,6 +1017,7 @@ export default function MovimientosPage() {
               <Label>Notas (opcional)</Label>
               <Input
                 placeholder="Notas de la venta..."
+                className="focus-visible:ring-offset-0"
                 value={ventaNotas}
                 onChange={(e) => setVentaNotas(e.target.value)}
               />
