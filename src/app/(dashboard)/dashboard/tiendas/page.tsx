@@ -458,8 +458,14 @@ export default function TiendasPage() {
         return;
       }
 
+      // Ordenar por marca A-Z antes de exportar
+      const sortedItems = [...data.items].sort((a: TiendaInventoryItem, b: TiendaInventoryItem) => {
+        const marcaCompare = a.marca.localeCompare(b.marca);
+        return marcaCompare !== 0 ? marcaCompare : a.amperaje.localeCompare(b.amperaje);
+      });
+      
       // Preparar datos para Excel
-      const excelData = data.items.map((item: TiendaInventoryItem) => ({
+      const excelData = sortedItems.map((item: TiendaInventoryItem) => ({
         'Marca': item.marca,
         'Amperaje': item.amperaje,
         'Cantidad': item.cantidad,

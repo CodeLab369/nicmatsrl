@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     // Ejecutar queries en paralelo para máxima velocidad
     const [mainResult, statsResult, globalStatsResult] = await Promise.all([
-      query.order('created_at', { ascending: false }).range(offset, offset + limit - 1),
+      query.order('marca', { ascending: true }).order('amperaje', { ascending: true }).range(offset, offset + limit - 1),
       applyFilters(supabase.from('inventory').select('cantidad, costo, precio_venta'), false),
       supabase.from('inventory').select('cantidad, costo, precio_venta')
     ]);

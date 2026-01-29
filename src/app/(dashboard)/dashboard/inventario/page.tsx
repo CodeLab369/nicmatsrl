@@ -347,9 +347,15 @@ export default function InventarioPage() {
     }
   };
 
-  // Exportar a Excel
+  // Exportar a Excel (ordenado por marca A-Z)
   const handleExport = () => {
-    const exportData = items.map(item => ({
+    // Ordenar por marca alfabéticamente antes de exportar
+    const sortedItems = [...items].sort((a, b) => {
+      const marcaCompare = a.marca.localeCompare(b.marca);
+      return marcaCompare !== 0 ? marcaCompare : a.amperaje.localeCompare(b.amperaje);
+    });
+    
+    const exportData = sortedItems.map(item => ({
       'Marca': item.marca,
       'Amperaje': item.amperaje,
       'Cantidad': item.cantidad,
