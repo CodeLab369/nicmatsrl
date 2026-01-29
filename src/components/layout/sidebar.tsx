@@ -13,9 +13,11 @@ import {
   Store,
   TrendingUp,
   BarChart3,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts';
+import { useAuth, useRealtimeContext } from '@/contexts';
 import { COMPANY, ROUTES, USER_ROLES } from '@/lib/constants';
 import { Separator } from '@/components/ui';
 
@@ -104,6 +106,7 @@ const navigation: NavGroup[] = [
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { isConnected, connectionStatus } = useRealtimeContext();
 
   const isActiveLink = (href: string) => {
     if (href === ROUTES.DASHBOARD) {
@@ -182,6 +185,22 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       {/* Footer del sidebar */}
       <div className="px-6 py-4 border-t">
+        {/* Indicador de conexión en tiempo real */}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          {isConnected ? (
+            <>
+              <Wifi className="w-3.5 h-3.5 text-green-500" />
+              <span className="text-xs text-green-600 dark:text-green-400">En tiempo real</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span className="text-xs text-amber-600 dark:text-amber-400">
+                {connectionStatus === 'INITIALIZING' ? 'Conectando...' : 'Sin conexión'}
+              </span>
+            </>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground text-center">
           {COMPANY.name} &copy; {new Date().getFullYear()}
         </p>
