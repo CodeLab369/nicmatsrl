@@ -13,15 +13,22 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('session');
     
+    // Si no hay sesión, simplemente retornar ok sin hacer nada
     if (!sessionCookie?.value) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+      return NextResponse.json({ ok: true, skipped: true });
     }
 
-    const session = JSON.parse(sessionCookie.value);
+    let session;
+    try {
+      session = JSON.parse(sessionCookie.value);
+    } catch {
+      return NextResponse.json({ ok: true, skipped: true });
+    }
+    
     const userId = session.userId;
 
     if (!userId) {
-      return NextResponse.json({ error: 'Usuario no válido' }, { status: 401 });
+      return NextResponse.json({ ok: true, skipped: true });
     }
 
     // Verificar que el usuario esté activo
