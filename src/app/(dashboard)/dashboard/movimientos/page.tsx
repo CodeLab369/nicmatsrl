@@ -81,6 +81,7 @@ interface Venta {
   ganancia: number;
   notas: string | null;
   created_at: string;
+  items?: VentaItem[];
 }
 
 interface VentaItem {
