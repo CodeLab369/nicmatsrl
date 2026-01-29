@@ -908,7 +908,7 @@ export default function MovimientosPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col gap-4 px-1">
+          <div className="flex-1 overflow-hidden flex flex-col gap-4 px-1 pt-1">
             {/* Búsqueda y resumen */}
             <div className="flex items-center justify-between gap-4">
               <div className="relative flex-1 max-w-xs">
@@ -1013,7 +1013,7 @@ export default function MovimientosPage() {
             </div>
 
             {/* Notas */}
-            <div>
+            <div className="pb-1">
               <Label>Notas (opcional)</Label>
               <Input
                 placeholder="Notas de la venta..."
