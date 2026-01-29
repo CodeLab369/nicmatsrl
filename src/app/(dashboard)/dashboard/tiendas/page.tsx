@@ -2822,32 +2822,9 @@ export default function TiendasPage() {
                     <Printer className="h-4 w-4" />
                     <span className="hidden sm:inline">Imprimir</span>
                   </Button>
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleAnalyzeSaldos(file);
-                        e.target.value = '';
-                      }}
-                      disabled={isAnalyzingSaldos}
-                    />
-                    <Button variant="outline" size="sm" className="gap-1.5" asChild disabled={isAnalyzingSaldos}>
-                      <span>
-                        {isAnalyzingSaldos ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                        <span className="hidden xs:inline">Saldo Anterior</span>
-                      </span>
-                    </Button>
-                  </label>
-                  <Button variant="ghost" size="sm" onClick={handleDownloadSaldosFormat} className="gap-1.5" title="Descargar formato de saldo anterior">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span className="hidden sm:inline">Formato</span>
+                  <Button variant="outline" size="sm" onClick={() => setSaldosDialogOpen(true)} className="gap-1.5" title="Agregar saldo anterior">
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden xs:inline">Saldo Anterior</span>
                   </Button>
                   <Button variant="outline" size="sm" onClick={handleExportTiendaInventory} className="gap-1.5" disabled={tiendaStats.totalProductos === 0}>
                     <Download className="h-4 w-4" />
