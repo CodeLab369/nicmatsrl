@@ -136,9 +136,6 @@ export default function EstadisticasPage() {
           <h1 className="text-2xl md:text-3xl font-bold">Estadísticas</h1>
           <p className="text-muted-foreground">Análisis de ventas y rendimiento del negocio</p>
         </div>
-            Análisis de ventas y rendimiento del negocio
-          </p>
-        </div>
 
         {/* Filtros */}
         <Card>
