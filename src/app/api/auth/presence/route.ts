@@ -1,31 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'nicmat-srl-secret-key-2024'
+);
+
 // POST - Actualizar presencia (heartbeat)
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session');
+    const authToken = cookieStore.get('auth-token');
     
-    // Si no hay sesión, simplemente retornar ok sin hacer nada
-    if (!sessionCookie?.value) {
+    // Si no hay token, simplemente retornar ok sin hacer nada
+    if (!authToken?.value) {
       return NextResponse.json({ ok: true, skipped: true });
     }
 
-    let session;
+    let userId: string;
     try {
-      session = JSON.parse(sessionCookie.value);
+      const { payload } = await jwtVerify(authToken.value, JWT_SECRET);
+      userId = payload.userId as string;
     } catch {
       return NextResponse.json({ ok: true, skipped: true });
     }
-    
-    const userId = session.userId;
 
     if (!userId) {
       return NextResponse.json({ ok: true, skipped: true });
@@ -56,7 +60,6 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         is_online: true,
         last_seen: new Date().toISOString(),
-        session_id: session.sessionId || null,
       }, {
         onConflict: 'user_id'
       });
@@ -77,14 +80,19 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session');
+    const authToken = cookieStore.get('auth-token');
     
-    if (!sessionCookie?.value) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    if (!authToken?.value) {
+      return NextResponse.json({ ok: true });
     }
 
-    const session = JSON.parse(sessionCookie.value);
-    const userId = session.userId;
+    let userId: string;
+    try {
+      const { payload } = await jwtVerify(authToken.value, JWT_SECRET);
+      userId = payload.userId as string;
+    } catch {
+      return NextResponse.json({ ok: true });
+    }
 
     if (userId) {
       await supabase
