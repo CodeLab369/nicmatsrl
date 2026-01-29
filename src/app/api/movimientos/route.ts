@@ -17,16 +17,29 @@ export async function GET(request: NextRequest) {
     // 1. Obtener ventas de cotizaciones (estado = 'convertida')
     let cotizacionesQuery = supabase
       .from('cotizaciones')
-      .select('total, ganancia, created_at')
+      .select('id, total, productos, fecha, created_at')
       .eq('estado', 'convertida');
 
-    if (fechaDesde) cotizacionesQuery = cotizacionesQuery.gte('created_at', `${fechaDesde}T00:00:00`);
-    if (fechaHasta) cotizacionesQuery = cotizacionesQuery.lte('created_at', `${fechaHasta}T23:59:59`);
+    if (fechaDesde) cotizacionesQuery = cotizacionesQuery.gte('fecha', fechaDesde);
+    if (fechaHasta) cotizacionesQuery = cotizacionesQuery.lte('fecha', fechaHasta);
 
-    const { data: cotizaciones } = await cotizacionesQuery;
+    const { data: cotizaciones, error: cotError } = await cotizacionesQuery;
+    
+    if (cotError) {
+      console.error('Error fetching cotizaciones:', cotError);
+    }
+
+    // Calcular ganancia desde productos (precio_venta - costo) * cantidad
+    let cotizacionesGanancia = 0;
+    cotizaciones?.forEach(cot => {
+      const productos = cot.productos || [];
+      productos.forEach((p: { cantidad: number; precio_venta: number; costo?: number }) => {
+        const gananciaProducto = ((p.precio_venta || 0) - (p.costo || 0)) * (p.cantidad || 0);
+        cotizacionesGanancia += gananciaProducto;
+      });
+    });
 
     const cotizacionesTotal = cotizaciones?.reduce((sum, c) => sum + (c.total || 0), 0) || 0;
-    const cotizacionesGanancia = cotizaciones?.reduce((sum, c) => sum + (c.ganancia || 0), 0) || 0;
     const cotizacionesCount = cotizaciones?.length || 0;
 
     // 2. Obtener todas las tiendas para el resumen
