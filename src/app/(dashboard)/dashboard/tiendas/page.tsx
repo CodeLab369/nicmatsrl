@@ -568,6 +568,34 @@ export default function TiendasPage() {
     }
   };
 
+  // Imprimir inventario de tienda como PDF
+  const handlePrintTiendaInventory = async () => {
+    if (!selectedTienda) return;
+
+    try {
+      // Obtener TODOS los items de la tienda
+      const response = await fetch(`/api/tienda-inventario?tiendaId=${selectedTienda.id}&noPagination=true`);
+      const data = await response.json();
+      
+      if (!data.items || data.items.length === 0) {
+        toast({ title: 'Sin datos', description: 'No hay productos para imprimir', variant: 'destructive' });
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      const html = generateTiendaInventoryPDFHTML(selectedTienda, data.items);
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (error) {
+      toast({ title: 'Error', description: 'Error al generar PDF', variant: 'destructive' });
+    }
+  };
+
   const handleTransferItemChange = (id: string, field: 'selected' | 'cantidadEnviar', value: boolean | number) => {
     setTransferItems(prev => prev.map(item => {
       if (item.id === id) {
@@ -1828,6 +1856,358 @@ export default function TiendasPage() {
     setLastConfirmedEnvio(null);
   };
 
+  // Generar HTML para PDF de inventario de tienda
+  const generateTiendaInventoryPDFHTML = (tienda: Tienda, items: TiendaInventoryItem[]) => {
+    const fechaFormat = new Date().toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    const cfg = empresaConfig;
+    const colorPrincipal = cfg.color_principal || '#1a5f7a';
+    
+    function adjustColor(color: string, amount: number): string {
+      const hex = color.replace('#', '');
+      const r = Math.min(255, parseInt(hex.substring(0, 2), 16) + amount);
+      const g = Math.min(255, parseInt(hex.substring(2, 4), 16) + amount);
+      const b = Math.min(255, parseInt(hex.substring(4, 6), 16) + amount);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
+    const gradiente = `linear-gradient(135deg, ${colorPrincipal} 0%, ${adjustColor(colorPrincipal, 40)} 100%)`;
+    
+    const logoHTML = cfg.logo 
+      ? `<img src="${cfg.logo}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain; border-radius: 8px;">`
+      : `<div class="company-logo-placeholder">${cfg.nombre.substring(0, 2).toUpperCase()}</div>`;
+    
+    const telefonos = [cfg.telefono_principal, cfg.telefono_secundario, cfg.telefono_adicional].filter(Boolean).join(' | ');
+
+    // Ordenar por marca
+    const sortedItems = [...items].sort((a, b) => {
+      const marcaCompare = a.marca.localeCompare(b.marca);
+      return marcaCompare !== 0 ? marcaCompare : a.amperaje.localeCompare(b.amperaje);
+    });
+
+    // Calcular totales
+    const totalUnidades = sortedItems.reduce((sum, p) => sum + p.cantidad, 0);
+    const totalValor = sortedItems.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
+    
+    const productosHTML = sortedItems.map((p, i) => `
+      <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center;">${i + 1}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; font-weight: 500;">${p.marca}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef;">${p.amperaje}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: center; font-weight: 600;">${p.cantidad}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${p.precio_venta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 600;">Bs. ${(p.precio_venta * p.cantidad).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+    return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventario ${tienda.nombre} - ${fechaFormat}</title>
+  <style>
+    :root {
+      --color-principal: ${colorPrincipal};
+      --gradiente: ${gradiente};
+    }
+    @page {
+      size: letter;
+      margin: 10mm;
+    }
+    @media print {
+      html, body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 10pt;
+      color: #333;
+      line-height: 1.4;
+      background: white;
+    }
+    .container {
+      max-width: 100%;
+      padding: 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid var(--color-principal);
+    }
+    .company-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex: 1;
+    }
+    .company-logo-placeholder {
+      width: 60px;
+      height: 60px;
+      background: var(--gradiente);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 22px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .company-text {
+      flex: 1;
+    }
+    .company-name {
+      font-size: 18pt;
+      font-weight: 700;
+      color: var(--color-principal);
+      margin-bottom: 3px;
+    }
+    .company-details {
+      font-size: 8pt;
+      color: #666;
+      line-height: 1.5;
+    }
+    .doc-info {
+      text-align: right;
+    }
+    .doc-title {
+      background: var(--gradiente);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 6px;
+      font-size: 12pt;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .doc-date {
+      font-size: 9pt;
+      color: #666;
+    }
+    .tienda-box {
+      background: #f8f9fa;
+      border-left: 4px solid var(--color-principal);
+      padding: 12px 15px;
+      margin-bottom: 20px;
+      border-radius: 0 6px 6px 0;
+    }
+    .tienda-title {
+      font-size: 9pt;
+      font-weight: 600;
+      color: var(--color-principal);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .tienda-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 5px 20px;
+    }
+    .tienda-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 9pt;
+    }
+    .tienda-item label {
+      font-weight: 600;
+      color: var(--color-principal);
+      white-space: nowrap;
+    }
+    .tienda-item label::after {
+      content: ':';
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+      font-size: 9pt;
+    }
+    th {
+      background: var(--gradiente);
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 8pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    th:first-child { border-radius: 6px 0 0 0; }
+    th:last-child { border-radius: 0 6px 0 0; text-align: right; }
+    th:nth-child(4) { text-align: center; }
+    th:nth-child(5) { text-align: right; }
+    td {
+      font-size: 9pt;
+    }
+    .total-row {
+      background: #e8f5e9 !important;
+    }
+    .total-row td {
+      font-weight: 700;
+      padding: 12px 10px;
+      border-top: 2px solid var(--color-principal);
+      font-size: 10pt;
+    }
+    .summary-box {
+      margin-top: 15px;
+      background: var(--gradiente);
+      color: white;
+      border-radius: 8px;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+    .summary-item {
+      text-align: center;
+    }
+    .summary-label {
+      font-size: 9pt;
+      opacity: 0.9;
+      margin-bottom: 3px;
+    }
+    .summary-value {
+      font-size: 16pt;
+      font-weight: 700;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 15px;
+      border-top: 2px solid #e9ecef;
+      margin-top: 20px;
+    }
+    .footer-company {
+      font-size: 10pt;
+      font-weight: 600;
+      color: var(--color-principal);
+    }
+    .footer-thanks {
+      font-size: 9pt;
+      color: #666;
+      margin: 3px 0;
+    }
+    .footer-contact {
+      font-size: 8pt;
+      color: #888;
+    }
+    table {
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="company-info">
+        ${logoHTML}
+        <div class="company-text">
+          <div class="company-name">${cfg.nombre}</div>
+          <div class="company-details">
+            ${cfg.nit ? `NIT: ${cfg.nit}<br>` : ''}
+            ${cfg.direccion ? `${cfg.direccion}` : ''}${cfg.ciudad ? ` - ${cfg.ciudad}` : ''}<br>
+            ${telefonos ? `Tel: ${telefonos}` : ''}${cfg.email ? ` | ${cfg.email}` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="doc-info">
+        <div class="doc-title">INVENTARIO</div>
+        <div class="doc-date">
+          <strong>Fecha:</strong> ${fechaFormat}
+        </div>
+      </div>
+    </div>
+
+    <!-- Datos de la tienda -->
+    <div class="tienda-box">
+      <div class="tienda-title">Datos de la Tienda</div>
+      <div class="tienda-grid">
+        <div class="tienda-item">
+          <label>Tienda</label>
+          <span>${tienda.nombre}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Encargado</label>
+          <span>${tienda.encargado || '-'}</span>
+        </div>
+        <div class="tienda-item">
+          <label>Ciudad</label>
+          <span>${tienda.ciudad || '-'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de productos -->
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 35px; text-align: center;">N°</th>
+          <th style="width: 25%;">Marca</th>
+          <th style="width: 18%;">Amperaje</th>
+          <th style="width: 12%; text-align: center;">Cantidad</th>
+          <th style="width: 18%; text-align: right;">P. Unit.</th>
+          <th style="width: 18%; text-align: right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${productosHTML}
+        <tr class="total-row">
+          <td colspan="3" style="text-align: right;">TOTAL:</td>
+          <td style="text-align: center;">${totalUnidades}</td>
+          <td></td>
+          <td style="text-align: right;">Bs. ${totalValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Resumen -->
+    <div class="summary-box">
+      <div class="summary-item">
+        <div class="summary-label">Total Productos</div>
+        <div class="summary-value">${sortedItems.length}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Total Unidades</div>
+        <div class="summary-value">${totalUnidades}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Valor Total</div>
+        <div class="summary-value">Bs. ${totalValor.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-company">${cfg.pie_empresa || cfg.nombre}</div>
+      <div class="footer-thanks">${cfg.pie_agradecimiento || '¡Gracias por su confianza!'}</div>
+      <div class="footer-contact">${cfg.pie_contacto || (telefonos ? `Para consultas: ${telefonos}${cfg.email ? ' | ' + cfg.email : ''}` : '')}</div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  };
+
   // Analizar archivo de saldos anteriores
   const handleAnalyzeSaldos = async (file: File) => {
     if (!selectedTienda) return;
@@ -2274,6 +2654,10 @@ export default function TiendasPage() {
               </div>
               {selectedTienda && (
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handlePrintTiendaInventory()} className="gap-1.5" disabled={tiendaStats.totalProductos === 0} title="Imprimir inventario">
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">Imprimir</span>
+                  </Button>
                   <label className="cursor-pointer">
                     <input
                       type="file"
