@@ -3407,19 +3407,19 @@ export default function TiendasPage() {
 
           {/* Barra de acciones para precios */}
           {selectedEnvio?.estado !== 'completado' && (
-            <div className="flex items-center gap-2 py-2 px-1 bg-muted/50 rounded-lg">
+            <div className="flex flex-wrap items-center gap-2 py-2 px-2 bg-muted/50 rounded-lg">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleApplyOriginalPrices}
-                className="gap-1.5"
+                className="gap-1.5 text-xs sm:text-sm"
               >
                 <Copy className="h-4 w-4" />
-                Aplicar Precios Originales
+                <span className="hidden xs:inline">Aplicar</span> Precios Originales
               </Button>
-              <div className="flex-1" />
+              <div className="flex-1 min-w-0" />
               {Object.keys(editedPrices).length > 0 && (
-                <Badge variant="secondary" className="mr-2">
+                <Badge variant="secondary" className="text-xs">
                   {Object.keys(editedPrices).length} precio(s) modificado(s)
                 </Badge>
               )}
@@ -3427,19 +3427,14 @@ export default function TiendasPage() {
                 size="sm" 
                 onClick={handleSavePrices}
                 disabled={isSavingPrices || Object.keys(editedPrices).length === 0}
-                className="gap-1.5"
+                className="gap-1.5 min-w-fit"
               >
                 {isSavingPrices ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Guardando...
-                  </>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Guardar Precios
-                  </>
+                  <Save className="h-4 w-4" />
                 )}
+                <span className="hidden sm:inline">{isSavingPrices ? 'Guardando...' : 'Guardar'}</span>
               </Button>
             </div>
           )}
@@ -3516,66 +3511,68 @@ export default function TiendasPage() {
             )}
           </div>
 
-          <DialogFooter className="mt-4 gap-2 flex-wrap">
-            <Button 
-              variant="outline" 
-              onClick={() => selectedEnvio && selectedTienda && handlePrintEnvio(selectedEnvio, envioItems, selectedTienda)} 
-              className="gap-2"
-              disabled={loadingEnvioItems || envioItems.length === 0}
-            >
-              <Printer className="h-4 w-4" />
-              Imprimir PDF
-            </Button>
-            <Button variant="outline" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-2">
-              <Download className="h-4 w-4" />
-              Exportar Excel
-            </Button>
-            <label className="cursor-pointer">
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && selectedEnvio) {
-                    handleImportEnvio(selectedEnvio.id, file);
-                    setEditedPrices({});
-                  }
-                  e.target.value = '';
-                }}
-                disabled={isImporting || selectedEnvio?.estado === 'completado'}
-              />
-              <Button variant="outline" className="gap-2" asChild disabled={isImporting || selectedEnvio?.estado === 'completado'}>
-                <span>
-                  <Upload className="h-4 w-4" />
-                  {isImporting ? 'Importando...' : 'Importar Precios'}
-                </span>
+          <DialogFooter className="mt-4 border-t pt-4">
+            <div className="flex flex-col w-full gap-2">
+              <Button variant="ghost" onClick={() => { setEnvioDetailOpen(false); setEditedPrices({}); }} className="w-full">
+                Cerrar
               </Button>
-            </label>
-            {(selectedEnvio?.estado === 'precios_asignados' || 
-              (selectedEnvio?.estado === 'pendiente' && envioItems.every(i => (editedPrices[i.id] !== undefined) || i.precio_tienda !== null))) && (
+              <label className="cursor-pointer w-full">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && selectedEnvio) {
+                      handleImportEnvio(selectedEnvio.id, file);
+                      setEditedPrices({});
+                    }
+                    e.target.value = '';
+                  }}
+                  disabled={isImporting || selectedEnvio?.estado === 'completado'}
+                />
+                <Button variant="outline" className="gap-2 w-full" asChild disabled={isImporting || selectedEnvio?.estado === 'completado'}>
+                  <span>
+                    <Upload className="h-4 w-4" />
+                    {isImporting ? 'Importando...' : 'Importar Precios'}
+                  </span>
+                </Button>
+              </label>
+              <Button variant="outline" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-2 w-full">
+                <Download className="h-4 w-4" />
+                Exportar Excel
+              </Button>
               <Button 
-                onClick={() => selectedEnvio && handleConfirmEnvio(selectedEnvio.id)} 
-                disabled={isConfirming || Object.keys(editedPrices).length > 0}
-                className="gap-2"
-                title={Object.keys(editedPrices).length > 0 ? 'Guarda los precios primero' : ''}
+                variant="outline" 
+                onClick={() => selectedEnvio && selectedTienda && handlePrintEnvio(selectedEnvio, envioItems, selectedTienda)} 
+                className="gap-2 w-full"
+                disabled={loadingEnvioItems || envioItems.length === 0}
               >
-                {isConfirming ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Confirmando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Confirmar Envío
-                  </>
-                )}
+                <Printer className="h-4 w-4" />
+                Imprimir PDF
               </Button>
-            )}
-            <Button variant="ghost" onClick={() => { setEnvioDetailOpen(false); setEditedPrices({}); }}>
-              Cerrar
-            </Button>
+              {(selectedEnvio?.estado === 'precios_asignados' || 
+                (selectedEnvio?.estado === 'pendiente' && envioItems.every(i => (editedPrices[i.id] !== undefined) || i.precio_tienda !== null))) && (
+                <Button 
+                  onClick={() => selectedEnvio && handleConfirmEnvio(selectedEnvio.id)} 
+                  disabled={isConfirming || Object.keys(editedPrices).length > 0}
+                  className="gap-2 w-full"
+                  title={Object.keys(editedPrices).length > 0 ? 'Guarda los precios primero' : ''}
+                >
+                  {isConfirming ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Confirmando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Confirmar Envío
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
