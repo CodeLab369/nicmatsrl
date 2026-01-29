@@ -129,15 +129,13 @@ export default function EstadisticasPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" />
-            Estadísticas
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold">Estadísticas</h1>
+          <p className="text-muted-foreground">Análisis de ventas y rendimiento del negocio</p>
+        </div>
             Análisis de ventas y rendimiento del negocio
           </p>
         </div>
