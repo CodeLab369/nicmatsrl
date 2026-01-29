@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Package, Store, FileText } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
@@ -46,6 +46,7 @@ export function EditUserDialog({
     inventario: true,
     tiendas: true,
     cotizaciones: true,
+    estadisticas: true,
   });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -85,6 +86,7 @@ export function EditUserDialog({
       inventario: true,
       tiendas: true,
       cotizaciones: true,
+      estadisticas: true,
     });
   }, [user, reset]);
 
@@ -277,6 +279,19 @@ export function EditUserDialog({
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Cotizaciones</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.estadisticas}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, estadisticas: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Estadísticas</span>
                 </div>
               </label>
             </div>

@@ -22,6 +22,7 @@ import {
   ArrowRight,
   ShoppingCart,
   CheckCircle,
+  BarChart3,
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -215,6 +216,15 @@ export default function DashboardPage() {
                     <ShoppingCart className="h-8 w-8 text-amber-500 mb-2" />
                     <span className="text-sm font-medium">Tiendas</span>
                     <span className="text-xs text-muted-foreground">Gestionar tiendas</span>
+                  </div>
+                </Link>
+              )}
+              {user?.permissions?.estadisticas && (
+                <Link href="/dashboard/estadisticas">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-colors cursor-pointer">
+                    <BarChart3 className="h-8 w-8 text-purple-500 mb-2" />
+                    <span className="text-sm font-medium">Estadísticas</span>
+                    <span className="text-xs text-muted-foreground">Análisis de ventas</span>
                   </div>
                 </Link>
               )}

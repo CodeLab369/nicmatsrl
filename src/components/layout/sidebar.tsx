@@ -29,7 +29,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
-  permission?: 'inventario' | 'tiendas' | 'cotizaciones';
+  permission?: 'inventario' | 'tiendas' | 'cotizaciones' | 'estadisticas';
 }
 
 interface NavGroup {
@@ -78,6 +78,7 @@ const navigation: NavGroup[] = [
         title: 'Estadísticas',
         href: ROUTES.STATISTICS,
         icon: BarChart3,
+        permission: 'estadisticas',
       },
     ],
   },

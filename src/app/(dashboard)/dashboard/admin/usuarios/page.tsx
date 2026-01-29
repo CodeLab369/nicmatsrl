@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw, Circle, Package, Store, FileText } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw, Circle, Package, Store, FileText, BarChart3 } from 'lucide-react';
 import { useAuth, useTableSubscription } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types';
@@ -177,10 +177,10 @@ export default function UsersPage() {
     );
   };
 
-  const getPermissionsBadges = (permissions?: { inventario?: boolean; tiendas?: boolean; cotizaciones?: boolean }) => {
+  const getPermissionsBadges = (permissions?: { inventario?: boolean; tiendas?: boolean; cotizaciones?: boolean; estadisticas?: boolean }) => {
     if (!permissions) return null;
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-1 flex-wrap">
         {permissions.inventario && (
           <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
             <Package className="h-3 w-3" />
@@ -194,6 +194,11 @@ export default function UsersPage() {
         {permissions.cotizaciones && (
           <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
             <FileText className="h-3 w-3" />
+          </Badge>
+        )}
+        {permissions.estadisticas && (
+          <Badge variant="outline" className="text-xs px-1.5 py-0 gap-0.5">
+            <BarChart3 className="h-3 w-3" />
           </Badge>
         )}
       </div>

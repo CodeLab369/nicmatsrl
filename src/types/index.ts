@@ -16,6 +16,7 @@ export interface UserPermissions {
   inventario: boolean;
   tiendas: boolean;
   cotizaciones: boolean;
+  estadisticas: boolean;
   [key: string]: boolean; // Para módulos futuros
 }
 
