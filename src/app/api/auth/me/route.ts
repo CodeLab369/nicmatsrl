@@ -34,6 +34,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ user: null });
     }
 
+    // Permisos por defecto (para usuarios antiguos que no tengan todos los permisos)
+    const DEFAULT_PERMISSIONS = {
+      inventario: false,
+      tiendas: false,
+      cotizaciones: false,
+      estadisticas: false,
+    };
+
+    // Merge de permisos
+    const userPermissions = {
+      ...DEFAULT_PERMISSIONS,
+      ...(user.permissions || {}),
+    };
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -43,7 +57,7 @@ export async function GET(request: NextRequest) {
         isActive: user.is_active,
         lastLogin: user.last_login,
         createdAt: user.created_at,
-        permissions: user.permissions || { inventario: true, tiendas: true, cotizaciones: true, estadisticas: true },
+        permissions: userPermissions,
       },
     });
   } catch (error) {

@@ -65,6 +65,20 @@ export async function POST(request: NextRequest) {
       .setIssuedAt()
       .sign(JWT_SECRET);
 
+    // Permisos por defecto (para usuarios antiguos que no tengan todos los permisos)
+    const DEFAULT_PERMISSIONS = {
+      inventario: false,
+      tiendas: false,
+      cotizaciones: false,
+      estadisticas: false,
+    };
+
+    // Merge de permisos: usar los del usuario si existen, sino defaults
+    const userPermissions = {
+      ...DEFAULT_PERMISSIONS,
+      ...(user.permissions || {}),
+    };
+
     // Preparar datos del usuario (sin password_hash)
     const userData = {
       id: user.id,
@@ -74,7 +88,7 @@ export async function POST(request: NextRequest) {
       isActive: user.is_active,
       lastLogin: user.last_login,
       createdAt: user.created_at,
-      permissions: user.permissions || { inventario: true, tiendas: true, cotizaciones: true, estadisticas: true },
+      permissions: userPermissions,
     };
 
     // Crear respuesta con cookie
