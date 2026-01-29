@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { logger } from '@/lib/utils';
 
 type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios';
 type Callback = () => void;
@@ -33,62 +34,37 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createBrowserClient();
     
-    console.log('[Realtime] Iniciando conexión...');
+    logger.log('[Realtime] Iniciando conexión...');
     
-    // Crear UN solo canal para todas las tablas
+    // Crear UN solo canal para todas las tablas - optimizado sin logs en cada callback
     const channel = supabase
       .channel('app-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, (payload) => {
-        console.log('[Realtime] 📦 Cambio en inventory:', payload.eventType, 'Suscriptores:', subscribers.inventory.size);
-        subscribers.inventory.forEach(cb => {
-          console.log('[Realtime] 📦 Ejecutando callback inventory...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        subscribers.inventory.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, (payload) => {
-        console.log('[Realtime] 📋 Cambio en cotizaciones:', payload.eventType, 'Suscriptores:', subscribers.cotizaciones.size);
-        subscribers.cotizaciones.forEach(cb => {
-          console.log('[Realtime] 📋 Ejecutando callback cotizaciones...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+        subscribers.cotizaciones.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, (payload) => {
-        console.log('[Realtime] ⚙️ Cambio en empresa_config:', payload.eventType, 'Suscriptores:', subscribers.empresa_config.size);
-        subscribers.empresa_config.forEach(cb => {
-          console.log('[Realtime] ⚙️ Ejecutando callback empresa_config...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, () => {
+        subscribers.empresa_config.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-        console.log('[Realtime] 👤 Cambio en users:', payload.eventType, 'Suscriptores:', subscribers.users.size);
-        subscribers.users.forEach(cb => {
-          console.log('[Realtime] 👤 Ejecutando callback users...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        subscribers.users.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tiendas' }, (payload) => {
-        console.log('[Realtime] 🏪 Cambio en tiendas:', payload.eventType, 'Suscriptores:', subscribers.tiendas.size);
-        subscribers.tiendas.forEach(cb => {
-          console.log('[Realtime] 🏪 Ejecutando callback tiendas...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tiendas' }, () => {
+        subscribers.tiendas.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_inventario' }, (payload) => {
-        console.log('[Realtime] 📦🏪 Cambio en tienda_inventario:', payload.eventType, 'Suscriptores:', subscribers.tienda_inventario.size);
-        subscribers.tienda_inventario.forEach(cb => {
-          console.log('[Realtime] 📦🏪 Ejecutando callback tienda_inventario...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_inventario' }, () => {
+        subscribers.tienda_inventario.forEach(cb => cb());
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, (payload) => {
-        console.log('[Realtime] 🟢 Cambio en user_presence:', payload.eventType, 'Suscriptores:', subscribers.user_presence.size);
-        subscribers.user_presence.forEach(cb => {
-          console.log('[Realtime] 🟢 Ejecutando callback user_presence...');
-          cb();
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, () => {
+        subscribers.user_presence.forEach(cb => cb());
       })
-      .subscribe((status, err) => {
-        console.log('[Realtime] Status:', status, err ? `Error: ${err.message}` : '');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_envios' }, () => {
+        subscribers.tienda_envios.forEach(cb => cb());
+      })
+      .subscribe((status) => {
+        logger.log('[Realtime] Status:', status);
         setIsConnected(status === 'SUBSCRIBED');
       });
 
@@ -96,7 +72,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     // Cleanup al desmontar
     return () => {
-      console.log('[Realtime] Cerrando conexión...');
+      logger.log('[Realtime] Cerrando conexión...');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -107,10 +83,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   // Función para suscribirse a una tabla
   const subscribe = useCallback((table: TableName, callback: Callback): (() => void) => {
     subscribers[table].add(callback);
-    console.log(`[Realtime] ✅ Suscrito a ${table}. Total suscriptores: ${subscribers[table].size}`);
     return () => {
       subscribers[table].delete(callback);
-      console.log(`[Realtime] ❌ Desuscrito de ${table}. Total suscriptores: ${subscribers[table].size}`);
     };
   }, []);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
@@ -167,7 +167,6 @@ export default function InventarioPage() {
 
   // Suscripción a Realtime centralizada
   const isRealtime = useTableSubscription('inventory', () => {
-    console.log('[Inventario] 🔄 Realtime callback ejecutado - refrescando datos...');
     fetchInventory();
     fetchMarcas();
   });

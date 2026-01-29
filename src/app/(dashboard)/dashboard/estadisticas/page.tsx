@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart3, TrendingUp, Package, Store, ShoppingCart, DollarSign,
-  Calendar, RefreshCw, ChevronUp, ChevronDown, Minus, Award, Target,
-  ArrowUpRight, ArrowDownRight, Filter, Download
+  Calendar, RefreshCw, ChevronUp, ChevronDown, Minus, Award, Target, Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';

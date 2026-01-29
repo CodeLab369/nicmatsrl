@@ -6,6 +6,11 @@ const nextConfig = {
   // Comprimir respuestas
   compress: true,
   
+  // Optimizaciones experimentales para rendimiento
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  },
+  
   // Configuración de imágenes optimizadas
   images: {
     remotePatterns: [
@@ -48,13 +53,13 @@ const nextConfig = {
           },
         ],
       },
-      // Caché para API routes
+      // Caché para API routes - permitir revalidación
       {
         source: '/api/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, must-revalidate',
+            value: 'private, no-cache, no-store, must-revalidate',
           },
         ],
       },
