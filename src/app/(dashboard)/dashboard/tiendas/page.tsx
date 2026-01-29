@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useMemo, useTransition } from 'react'
 import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
-  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download
+  Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download,
+  Upload, FileSpreadsheet, Clock, Check, AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -66,6 +67,29 @@ interface TransferItem extends InventoryItem {
   selected: boolean;
 }
 
+interface TiendaEnvio {
+  id: string;
+  tienda_id: string;
+  estado: 'pendiente' | 'precios_asignados' | 'completado' | 'cancelado';
+  total_productos: number;
+  total_unidades: number;
+  created_at: string;
+  updated_at: string;
+  completado_at: string | null;
+}
+
+interface EnvioItem {
+  id: string;
+  envio_id: string;
+  inventory_id: string;
+  marca: string;
+  amperaje: string;
+  cantidad: number;
+  costo_original: number;
+  precio_venta_original: number;
+  precio_tienda: number | null;
+}
+
 export default function TiendasPage() {
   // Estados principales
   const [tiendas, setTiendas] = useState<Tienda[]>([]);
@@ -124,6 +148,18 @@ export default function TiendasPage() {
   const [transferMarcas, setTransferMarcas] = useState<string[]>([]);
   const [loadingTransfer, setLoadingTransfer] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
+  
+  // Envíos pendientes
+  const [enviosPendientes, setEnviosPendientes] = useState<TiendaEnvio[]>([]);
+  const [loadingEnvios, setLoadingEnvios] = useState(false);
+  const [envioDetailOpen, setEnvioDetailOpen] = useState(false);
+  const [selectedEnvio, setSelectedEnvio] = useState<TiendaEnvio | null>(null);
+  const [envioItems, setEnvioItems] = useState<EnvioItem[]>([]);
+  const [loadingEnvioItems, setLoadingEnvioItems] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [deleteEnvioDialogOpen, setDeleteEnvioDialogOpen] = useState(false);
+  const [envioToDelete, setEnvioToDelete] = useState<TiendaEnvio | null>(null);
   
   const { toast } = useToast();
 
@@ -211,6 +247,36 @@ export default function TiendasPage() {
     }
   }, []);
 
+  // Fetch envíos pendientes de la tienda seleccionada
+  const fetchEnviosPendientes = useCallback(async () => {
+    if (!selectedTienda) return;
+    
+    try {
+      setLoadingEnvios(true);
+      const response = await fetch(`/api/tienda-envios?tiendaId=${selectedTienda.id}`);
+      const data = await response.json();
+      setEnviosPendientes(data.envios || []);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoadingEnvios(false);
+    }
+  }, [selectedTienda]);
+
+  // Fetch detalle de un envío
+  const fetchEnvioDetail = useCallback(async (envioId: string) => {
+    try {
+      setLoadingEnvioItems(true);
+      const response = await fetch(`/api/tienda-envios?envioId=${envioId}`);
+      const data = await response.json();
+      setEnvioItems(data.items || []);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoadingEnvioItems(false);
+    }
+  }, []);
+
   // Effects
   useEffect(() => {
     fetchTiendas();
@@ -219,8 +285,9 @@ export default function TiendasPage() {
   useEffect(() => {
     if (selectedTienda) {
       fetchTiendaInventory();
+      fetchEnviosPendientes();
     }
-  }, [selectedTienda, fetchTiendaInventory]);
+  }, [selectedTienda, fetchTiendaInventory, fetchEnviosPendientes]);
 
   useEffect(() => {
     setPage(1);
@@ -242,6 +309,9 @@ export default function TiendasPage() {
   });
   useTableSubscription('inventory', () => {
     if (transferDialogOpen) fetchInventarioCentral();
+  });
+  useTableSubscription('tienda_envios', () => {
+    if (selectedTienda) fetchEnviosPendientes();
   });
 
   // Handlers
@@ -462,7 +532,8 @@ export default function TiendasPage() {
 
     try {
       setIsTransferring(true);
-      const response = await fetch('/api/tienda-inventario', {
+      // Crear envío pendiente en lugar de transferir directamente
+      const response = await fetch('/api/tienda-envios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -476,25 +547,183 @@ export default function TiendasPage() {
       if (!response.ok) throw new Error(data.error);
 
       toast({ 
-        title: 'Transferencia completada', 
-        description: data.message, 
+        title: 'Envío creado', 
+        description: `${data.message}. Ahora exporta el Excel para asignar precios.`, 
         variant: 'success' 
       });
 
-      if (data.resultados?.errores?.length > 0) {
-        console.warn('Errores en transferencia:', data.resultados.errores);
-      }
-
       setTransferDialogOpen(false);
-      fetchTiendaInventory();
+      fetchEnviosPendientes();
     } catch (error) {
       toast({ 
         title: 'Error', 
-        description: error instanceof Error ? error.message : 'Error en la transferencia', 
+        description: error instanceof Error ? error.message : 'Error al crear envío', 
         variant: 'destructive' 
       });
     } finally {
       setIsTransferring(false);
+    }
+  };
+
+  // Abrir detalle del envío
+  const handleViewEnvio = async (envio: TiendaEnvio) => {
+    setSelectedEnvio(envio);
+    setEnvioDetailOpen(true);
+    await fetchEnvioDetail(envio.id);
+  };
+
+  // Exportar Excel del envío
+  const handleExportEnvio = async (envioId: string) => {
+    try {
+      const response = await fetch(`/api/tienda-envios/excel?envioId=${envioId}`);
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'envio.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({ title: 'Exportado', description: 'Archivo Excel descargado', variant: 'success' });
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al exportar', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  // Importar Excel con precios
+  const handleImportEnvio = async (envioId: string, file: File) => {
+    try {
+      setIsImporting(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('envioId', envioId);
+
+      const response = await fetch('/api/tienda-envios/excel', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error);
+
+      toast({ 
+        title: 'Precios importados', 
+        description: `${data.actualizados} precios actualizados. ${data.sinPrecio > 0 ? `${data.sinPrecio} sin precio.` : ''}`, 
+        variant: data.todosConPrecio ? 'success' : 'default' 
+      });
+
+      // Actualizar la lista y el detalle
+      fetchEnviosPendientes();
+      if (selectedEnvio?.id === envioId) {
+        fetchEnvioDetail(envioId);
+      }
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al importar', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Confirmar envío (mover a inventario de tienda)
+  const handleConfirmEnvio = async (envioId: string) => {
+    try {
+      setIsConfirming(true);
+      const response = await fetch('/api/tienda-envios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ envioId, action: 'confirmar' })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error);
+
+      toast({ 
+        title: 'Envío completado', 
+        description: data.message, 
+        variant: 'success' 
+      });
+
+      setEnvioDetailOpen(false);
+      setSelectedEnvio(null);
+      fetchEnviosPendientes();
+      fetchTiendaInventory();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al confirmar envío', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  // Eliminar/cancelar envío
+  const handleDeleteEnvio = async () => {
+    if (!envioToDelete) return;
+
+    try {
+      const response = await fetch(`/api/tienda-envios?envioId=${envioToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error);
+
+      toast({ 
+        title: 'Envío cancelado', 
+        description: data.message, 
+        variant: 'success' 
+      });
+
+      setDeleteEnvioDialogOpen(false);
+      setEnvioToDelete(null);
+      if (envioDetailOpen && selectedEnvio?.id === envioToDelete.id) {
+        setEnvioDetailOpen(false);
+        setSelectedEnvio(null);
+      }
+      fetchEnviosPendientes();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Error al cancelar envío', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  // Helper para estado del envío
+  const getEnvioEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case 'pendiente':
+        return <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 border gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
+      case 'precios_asignados':
+        return <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 border gap-1"><Check className="h-3 w-3" /> Listo</Badge>;
+      case 'completado':
+        return <Badge className="bg-green-500/15 text-green-600 border-green-500/30 border gap-1"><CheckCircle className="h-3 w-3" /> Completado</Badge>;
+      case 'cancelado':
+        return <Badge className="bg-red-500/15 text-red-600 border-red-500/30 border gap-1"><X className="h-3 w-3" /> Cancelado</Badge>;
+      default:
+        return <Badge variant="secondary">{estado}</Badge>;
     }
   };
 
@@ -912,6 +1141,101 @@ export default function TiendasPage() {
                     </div>
                   </>
                 )}
+
+                {/* Sección Envíos Pendientes */}
+                {selectedTienda && (
+                  <div className="mt-6 pt-6 border-t">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Envíos Pendientes
+                        {enviosPendientes.filter(e => e.estado !== 'completado').length > 0 && (
+                          <Badge variant="secondary" className="ml-2">
+                            {enviosPendientes.filter(e => e.estado !== 'completado').length}
+                          </Badge>
+                        )}
+                      </h3>
+                    </div>
+
+                    {loadingEnvios ? (
+                      <div className="text-center py-4">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                      </div>
+                    ) : enviosPendientes.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p>No hay envíos pendientes</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {enviosPendientes.filter(e => e.estado !== 'completado').map((envio) => (
+                          <div key={envio.id} className="p-3 border rounded-lg hover:bg-muted/50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {getEnvioEstadoBadge(envio.estado)}
+                                  <span className="text-sm text-muted-foreground">
+                                    {new Date(envio.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <p className="text-sm">
+                                  {envio.total_productos} productos • {envio.total_unidades} unidades
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewEnvio(envio)} title="Ver detalle">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleExportEnvio(envio.id)} title="Exportar Excel">
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <label className="cursor-pointer">
+                                  <input
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleImportEnvio(envio.id, file);
+                                      e.target.value = '';
+                                    }}
+                                    disabled={isImporting || envio.estado === 'completado'}
+                                  />
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild disabled={isImporting}>
+                                    <span title="Importar precios">
+                                      <Upload className="h-4 w-4" />
+                                    </span>
+                                  </Button>
+                                </label>
+                                {envio.estado === 'precios_asignados' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-green-600" 
+                                    onClick={() => handleConfirmEnvio(envio.id)}
+                                    disabled={isConfirming}
+                                    title="Confirmar y enviar a tienda"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-destructive" 
+                                  onClick={() => { setEnvioToDelete(envio); setDeleteEnvioDialogOpen(true); }}
+                                  title="Cancelar envío"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -1182,6 +1506,143 @@ export default function TiendasPage() {
             <AlertDialogCancel disabled={isReturning}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleReturnAllInventory} disabled={isReturning}>
               {isReturning ? 'Devolviendo...' : 'Confirmar Devolución'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Detalle de Envío */}
+      <Dialog open={envioDetailOpen} onOpenChange={setEnvioDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Detalle del Envío
+            </DialogTitle>
+            <DialogDescription>
+              {selectedEnvio && (
+                <span className="flex items-center gap-2 mt-1">
+                  {getEnvioEstadoBadge(selectedEnvio.estado)}
+                  <span className="text-muted-foreground">
+                    {selectedEnvio.total_productos} productos • {selectedEnvio.total_unidades} unidades
+                  </span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            {loadingEnvioItems ? (
+              <div className="text-center py-8">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-muted sticky top-0">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-medium">Marca</th>
+                    <th className="text-left py-3 px-4 font-medium">Amperaje</th>
+                    <th className="text-center py-3 px-4 font-medium">Cantidad</th>
+                    <th className="text-right py-3 px-4 font-medium">Precio Original</th>
+                    <th className="text-right py-3 px-4 font-medium">Precio Tienda</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {envioItems.map((item) => (
+                    <tr key={item.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{item.marca}</td>
+                      <td className="py-3 px-4">{item.amperaje}</td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge variant="secondary">{item.cantidad}</Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right text-muted-foreground">
+                        {formatCurrency(item.precio_venta_original)}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {item.precio_tienda !== null ? (
+                          <span className="font-medium text-green-600">{formatCurrency(item.precio_tienda)}</span>
+                        ) : (
+                          <span className="text-amber-500 flex items-center justify-end gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Sin precio
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-2">
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && selectedEnvio) handleImportEnvio(selectedEnvio.id, file);
+                  e.target.value = '';
+                }}
+                disabled={isImporting || selectedEnvio?.estado === 'completado'}
+              />
+              <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+                <span>
+                  <Upload className="h-4 w-4" />
+                  {isImporting ? 'Importando...' : 'Importar Precios'}
+                </span>
+              </Button>
+            </label>
+            {selectedEnvio?.estado === 'precios_asignados' && (
+              <Button 
+                onClick={() => selectedEnvio && handleConfirmEnvio(selectedEnvio.id)} 
+                disabled={isConfirming}
+                className="gap-2"
+              >
+                {isConfirming ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Confirmando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Confirmar Envío
+                  </>
+                )}
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setEnvioDetailOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Eliminar Envío */}
+      <AlertDialog open={deleteEnvioDialogOpen} onOpenChange={setDeleteEnvioDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              ¿Cancelar envío?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Se cancelará el envío de <strong>{envioToDelete?.total_unidades} unidades</strong> de <strong>{envioToDelete?.total_productos} productos</strong>.
+              <br /><br />
+              Las cantidades serán devueltas al inventario principal. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEnvio} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar Cancelación
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
