@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Eye, Printer, Check, X, Trash2,
   Package, User, Phone, Mail, MapPin, Calendar, AlertCircle,
   Minus, RefreshCw, Settings, Upload, Building2, Hash, Save, Pencil,
-  MessageCircle
+  MessageCircle, Download, Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -585,45 +585,82 @@ export default function CotizacionesPage() {
     }
   };
 
-  // Enviar por WhatsApp
-  const handleWhatsApp = (cotizacion: Cotizacion) => {
-    const cfg = empresaConfig;
-    const fechaFormat = new Date(cotizacion.fecha).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
-    
-    // Construir mensaje
-    let mensaje = `🔋 *COTIZACIÓN ${cotizacion.numero}*\n`;
-    mensaje += `📅 Fecha: ${fechaFormat}\n`;
-    mensaje += `━━━━━━━━━━━━━━━━━━━━\n\n`;
-    mensaje += `👤 *Cliente:* ${cotizacion.cliente_nombre}\n\n`;
-    mensaje += `📦 *PRODUCTOS:*\n`;
-    
-    cotizacion.productos.forEach((p, i) => {
-      mensaje += `${i + 1}. ${p.marca} ${p.amperaje}\n`;
-      mensaje += `   Cant: ${p.cantidad} | Bs. ${p.precio.toLocaleString('es-BO', { minimumFractionDigits: 2 })} c/u\n`;
-      mensaje += `   *Subtotal: Bs. ${p.total.toLocaleString('es-BO', { minimumFractionDigits: 2 })}*\n\n`;
-    });
-    
-    mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
-    if (cotizacion.descuento > 0) {
-      mensaje += `Subtotal: Bs. ${cotizacion.subtotal.toLocaleString('es-BO', { minimumFractionDigits: 2 })}\n`;
-      mensaje += `Descuento: -Bs. ${cotizacion.descuento.toLocaleString('es-BO', { minimumFractionDigits: 2 })}\n`;
+  // Estado para loading de WhatsApp
+  const [whatsappLoading, setWhatsappLoading] = useState<string | null>(null);
+
+  // Enviar por WhatsApp (genera PDF y abre WhatsApp)
+  const handleWhatsApp = async (cotizacion: Cotizacion) => {
+    try {
+      setWhatsappLoading(cotizacion.id);
+      
+      // 1. Generar el HTML del PDF
+      const html = generatePDFHTML(cotizacion);
+      
+      // 2. Crear elemento temporal para el PDF
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '210mm'; // A4 width
+      document.body.appendChild(container);
+      
+      // 3. Cargar html2pdf dinámicamente
+      const html2pdf = (await import('html2pdf.js')).default;
+      
+      // 4. Configuración del PDF
+      const opt = {
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `Cotizacion_${cotizacion.numero}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          letterRendering: true
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'letter', 
+          orientation: 'portrait' 
+        }
+      };
+      
+      // 5. Generar y descargar el PDF
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (html2pdf() as any).set(opt).from(container).save();
+      
+      // 6. Limpiar elemento temporal
+      document.body.removeChild(container);
+      
+      // 7. Mensaje simple para WhatsApp
+      const cfg = empresaConfig;
+      let mensaje = `¡Hola! 👋\n\n`;
+      mensaje += `Te envío la cotización *${cotizacion.numero}* de *${cfg.nombre}*.\n\n`;
+      mensaje += `📎 *El PDF está adjunto a este mensaje.*\n\n`;
+      mensaje += `💰 Total: *Bs. ${cotizacion.total.toLocaleString('es-BO', { minimumFractionDigits: 2 })}*\n`;
+      mensaje += `⏰ Válido por ${cotizacion.vigencia_dias} días\n\n`;
+      mensaje += `¡Quedamos atentos a cualquier consulta!`;
+      
+      // 8. Abrir WhatsApp SIN número predefinido
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      toast({
+        title: 'PDF descargado',
+        description: 'Adjunta el PDF en WhatsApp y selecciona el contacto',
+      });
+      
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo generar el PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setWhatsappLoading(null);
     }
-    mensaje += `💰 *TOTAL: Bs. ${cotizacion.total.toLocaleString('es-BO', { minimumFractionDigits: 2 })}*\n\n`;
-    mensaje += `⏰ Válido por ${cotizacion.vigencia_dias} días\n\n`;
-    mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
-    mensaje += `🏢 *${cfg.nombre}*\n`;
-    mensaje += `📞 ${cfg.telefono_principal}\n`;
-    if (cfg.direccion) mensaje += `📍 ${cfg.direccion}`;
-    
-    // Limpiar teléfono del cliente (solo números)
-    const telefonoLimpio = cotizacion.cliente_telefono?.replace(/\D/g, '') || '';
-    
-    // Crear URL de WhatsApp
-    const whatsappUrl = telefonoLimpio 
-      ? `https://wa.me/591${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`
-      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-    
-    window.open(whatsappUrl, '_blank');
   };
 
   // Imprimir/PDF
@@ -1542,9 +1579,14 @@ export default function CotizacionesPage() {
                               size="icon" 
                               className="h-8 w-8 text-green-600 hover:text-green-700"
                               onClick={() => handleWhatsApp(cot)}
-                              title="Enviar por WhatsApp"
+                              disabled={whatsappLoading === cot.id}
+                              title="Descargar PDF y enviar por WhatsApp"
                             >
-                              <MessageCircle className="h-4 w-4" />
+                              {whatsappLoading === cot.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
                             </Button>
                             {cot.estado === 'pendiente' && (
                               <>
@@ -1723,8 +1765,14 @@ export default function CotizacionesPage() {
               variant="outline" 
               className="text-green-600 border-green-600 hover:bg-green-50"
               onClick={() => selectedCotizacion && handleWhatsApp(selectedCotizacion)}
+              disabled={!!whatsappLoading}
             >
-              <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+              {whatsappLoading === selectedCotizacion?.id ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Enviar PDF por WhatsApp
             </Button>
             <Button onClick={() => selectedCotizacion && handlePrint(selectedCotizacion)}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir
