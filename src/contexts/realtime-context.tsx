@@ -16,7 +16,7 @@ interface RealtimeContextType {
 
 const RealtimeContext = createContext<RealtimeContextType | null>(null);
 
-// Almacén global de suscriptores por tabla (fuera del componente para persistir)
+// Almacén global de suscriptores por tabla
 const subscribers: Record<TableName, Set<Callback>> = {
   inventory: new Set(),
   cotizaciones: new Set(),
@@ -30,85 +30,63 @@ const subscribers: Record<TableName, Set<Callback>> = {
   tienda_gastos: new Set(),
 };
 
-// Singleton para el cliente Supabase y canal
-let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null;
-let channelInstance: RealtimeChannel | null = null;
-let isChannelSetup = false;
-
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('INITIALIZING');
   const [lastEvent, setLastEvent] = useState<{ table: string; type: string; time: Date } | null>(null);
-  const mountedRef = useRef(true);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const supabaseRef = useRef<ReturnType<typeof createBrowserClient> | null>(null);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
-    // Solo crear el canal una vez (singleton pattern)
-    if (!isChannelSetup) {
-      isChannelSetup = true;
-      
-      if (!supabaseInstance) {
-        supabaseInstance = createBrowserClient();
-      }
-      const supabase = supabaseInstance;
+    // Crear cliente Supabase
+    if (!supabaseRef.current) {
+      supabaseRef.current = createBrowserClient();
+    }
+    const supabase = supabaseRef.current;
 
-      // Handler genérico para cambios en tablas - ejecuta callbacks inmediatamente
-      const handleChange = (table: TableName) => (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-        if (mountedRef.current) {
-          setLastEvent({ table, type: payload.eventType, time: new Date() });
-        }
-        
-        // Ejecutar callbacks de forma síncrona para máxima velocidad
-        const callbacks = subscribers[table];
-        callbacks.forEach(cb => {
-          try {
-            cb();
-          } catch (err) {
-            console.error(`[Realtime] Error en callback de ${table}:`, err);
-          }
-        });
-      };
+    // Handler genérico para cambios en tablas
+    const handleChange = (table: TableName) => (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      setLastEvent({ table, type: payload.eventType, time: new Date() });
       
-      // Crear canal con todas las tablas
-      const channel = supabase
-        .channel('db-changes', {
-          config: {
-            broadcast: { self: true },
-          }
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, handleChange('inventory'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, handleChange('cotizaciones'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, handleChange('empresa_config'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleChange('users'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tiendas' }, handleChange('tiendas'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_inventario' }, handleChange('tienda_inventario'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_envios' }, handleChange('tienda_envios'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_ventas' }, handleChange('tienda_ventas'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_gastos' }, handleChange('tienda_gastos'))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, handleChange('user_presence'));
-
-      // Suscribirse al canal
-      channel.subscribe((status) => {
-        if (mountedRef.current) {
-          setConnectionStatus(status);
-          setIsConnected(status === 'SUBSCRIBED');
+      // Ejecutar callbacks
+      const callbacks = subscribers[table];
+      callbacks.forEach(cb => {
+        try {
+          cb();
+        } catch (err) {
+          console.error(`[Realtime] Error en callback de ${table}:`, err);
         }
       });
+    };
+    
+    // Crear canal con todas las tablas
+    const channel = supabase
+      .channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, handleChange('inventory'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, handleChange('cotizaciones'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'empresa_config' }, handleChange('empresa_config'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, handleChange('users'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tiendas' }, handleChange('tiendas'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_inventario' }, handleChange('tienda_inventario'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_envios' }, handleChange('tienda_envios'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_ventas' }, handleChange('tienda_ventas'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_gastos' }, handleChange('tienda_gastos'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, handleChange('user_presence'));
 
-      channelInstance = channel;
-    } else {
-      // Ya existe el canal, solo actualizar el estado local
-      if (channelInstance) {
-        const status = channelInstance.state;
-        setConnectionStatus(status === 'joined' ? 'SUBSCRIBED' : status);
-        setIsConnected(status === 'joined');
-      }
-    }
+    // Suscribirse al canal
+    channel.subscribe((status) => {
+      setConnectionStatus(status);
+      setIsConnected(status === 'SUBSCRIBED');
+    });
 
-    // Cleanup - no destruir el canal, solo marcar como desmontado
+    channelRef.current = channel;
+
+    // Cleanup
     return () => {
-      mountedRef.current = false;
+      if (channelRef.current && supabaseRef.current) {
+        supabaseRef.current.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, []);
 
