@@ -432,12 +432,27 @@ export default function InventarioPage() {
     try {
       setIsAnalyzing(true);
       
-      // Usar lectura optimizada (arrayBuffer en lugar de binary)
+      // Validar tipo de archivo
+      const validTypes = ['.xlsx', '.xls', '.csv'];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      if (!validTypes.includes(fileExtension)) {
+        toast({ 
+          title: 'Archivo no válido', 
+          description: 'Solo se permiten archivos Excel (.xlsx, .xls) o CSV', 
+          variant: 'destructive' 
+        });
+        setIsAnalyzing(false);
+        e.target.value = '';
+        return;
+      }
+      
+      // Usar lectura optimizada con mejor compatibilidad para tablets
       const data = await readExcelFast(file);
 
       if (data.length === 0) {
         toast({ title: 'Error', description: 'El archivo está vacío', variant: 'destructive' });
         setIsAnalyzing(false);
+        e.target.value = '';
         return;
       }
 
@@ -448,14 +463,16 @@ export default function InventarioPage() {
         body: JSON.stringify(data),
       });
 
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error('Error en la API');
       const result = await response.json();
       
       setImportData(data);
       setImportAnalysis(result.analysis);
       setImportDialogOpen(true);
-    } catch {
-      toast({ title: 'Error', description: 'Error al analizar el archivo', variant: 'destructive' });
+    } catch (error) {
+      console.error('Error importando:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al analizar el archivo';
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     } finally {
       setIsAnalyzing(false);
       e.target.value = '';

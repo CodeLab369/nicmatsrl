@@ -57,6 +57,7 @@ export function detectFileType(file: File): SupportedFileType {
 /**
  * Lee un archivo Excel o CSV de forma optimizada
  * Soporta: .xlsx, .xls, .csv (Google Sheets)
+ * Compatible con tablets y dispositivos móviles
  * @param file - Archivo a leer (File o ArrayBuffer)
  * @returns Promise con los datos en formato JSON
  */
@@ -66,38 +67,62 @@ export async function readExcelFast<T = Record<string, unknown>>(
   return new Promise((resolve, reject) => {
     try {
       const processData = (buffer: ArrayBuffer, isCSV = false) => {
-        let workbook;
-        
-        if (isCSV) {
-          // Para CSV, convertir a string primero (mejor para Google Sheets)
-          const decoder = new TextDecoder('utf-8');
-          const csvString = decoder.decode(buffer);
-          workbook = XLSX.read(csvString, { type: 'string', raw: true });
-        } else {
-          // Para Excel, usar configuración optimizada
-          workbook = XLSX.read(buffer, XLSX_OPTIONS.read);
+        try {
+          let workbook;
+          
+          if (isCSV) {
+            // Para CSV, convertir a string primero (mejor para Google Sheets)
+            const decoder = new TextDecoder('utf-8');
+            const csvString = decoder.decode(buffer);
+            workbook = XLSX.read(csvString, { type: 'string', raw: true });
+          } else {
+            // Para Excel, usar configuración optimizada
+            // Convertir ArrayBuffer a Uint8Array para mejor compatibilidad
+            const uint8Array = new Uint8Array(buffer);
+            workbook = XLSX.read(uint8Array, { type: 'array' });
+          }
+          
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // Convertir a JSON de forma eficiente
+          const data = XLSX.utils.sheet_to_json<T>(worksheet, {
+            raw: true,        // Valores crudos sin formateo
+            defval: '',       // Valor por defecto para celdas vacías
+          });
+          
+          // Normalizar datos (útil para Google Sheets que puede tener headers diferentes)
+          const normalizedData = normalizeSheetData(data as Record<string, unknown>[]) as T[];
+          
+          resolve(normalizedData);
+        } catch (parseError) {
+          console.error('Error parsing file:', parseError);
+          reject(new Error('Error al procesar el archivo. Verifica que sea un archivo Excel o CSV válido.'));
         }
-        
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convertir a JSON de forma eficiente
-        const data = XLSX.utils.sheet_to_json<T>(worksheet, {
-          raw: true,        // Valores crudos sin formateo
-          defval: '',       // Valor por defecto para celdas vacías
-        });
-        
-        // Normalizar datos (útil para Google Sheets que puede tener headers diferentes)
-        const normalizedData = normalizeSheetData(data as Record<string, unknown>[]) as T[];
-        
-        resolve(normalizedData);
       };
 
       if (file instanceof File) {
         const isCSV = file.name.toLowerCase().endsWith('.csv') || 
                       file.type === 'text/csv';
-        // Usar arrayBuffer que es más rápido que readAsBinaryString
-        file.arrayBuffer().then(buffer => processData(buffer, isCSV)).catch(reject);
+        
+        // Usar FileReader como fallback para mejor compatibilidad con tablets
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          const result = e.target?.result;
+          if (result instanceof ArrayBuffer) {
+            processData(result, isCSV);
+          } else {
+            reject(new Error('Error al leer el archivo'));
+          }
+        };
+        
+        reader.onerror = () => {
+          reject(new Error('Error al leer el archivo. Intenta seleccionarlo de nuevo.'));
+        };
+        
+        // readAsArrayBuffer tiene mejor soporte que arrayBuffer() en tablets
+        reader.readAsArrayBuffer(file);
       } else {
         processData(file);
       }
