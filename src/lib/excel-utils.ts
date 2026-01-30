@@ -150,79 +150,194 @@ export async function readGoogleSheet<T = Record<string, unknown>>(
 }
 
 /**
- * Normaliza los datos del archivo (útil para Google Sheets)
- * - Elimina espacios extra en headers y valores
- * - Normaliza nombres de columnas comunes
+ * Normaliza los datos del archivo para máxima compatibilidad
+ * Soporta:
+ * - Copiar/pegar desde Google Sheets, Excel u otros
+ * - Archivos creados manualmente sin usar el formato
+ * - Columnas con diferentes nombres/variaciones
+ * - Datos con formatos inconsistentes
  */
 function normalizeSheetData(data: Record<string, unknown>[]): Record<string, unknown>[] {
   if (data.length === 0) return data;
   
-  // Mapeo de nombres de columnas comunes (Google Sheets puede variar)
+  // Función para limpiar y normalizar nombres de columnas
+  const cleanColumnName = (name: string): string => {
+    return name
+      .toString()
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+      .replace(/[^a-z0-9]/g, '_')      // Reemplazar caracteres especiales por _
+      .replace(/_+/g, '_')              // Múltiples _ a uno solo
+      .replace(/^_|_$/g, '');           // Quitar _ al inicio/final
+  };
+  
+  // Mapeo flexible de nombres de columnas (clave = nombre limpio)
   const columnMappings: Record<string, string> = {
     // Variaciones de Marca
     'marca': 'marca',
     'brand': 'marca',
-    'Marca': 'marca',
-    'MARCA': 'marca',
+    'marcas': 'marca',
+    'nombre_marca': 'marca',
+    'nombre': 'marca', // Si solo hay "nombre" sin más contexto, asumir marca
+    
     // Variaciones de Amperaje
     'amperaje': 'amperaje',
     'amperage': 'amperaje',
-    'Amperaje': 'amperaje',
-    'AMPERAJE': 'amperaje',
+    'amperios': 'amperaje',
     'amp': 'amperaje',
-    'AMP': 'amperaje',
+    'amps': 'amperaje',
+    'amper': 'amperaje',
+    'capacidad': 'amperaje',
+    'ah': 'amperaje',
+    'modelo': 'amperaje', // A veces usan "modelo" para el amperaje
+    
     // Variaciones de Cantidad
     'cantidad': 'cantidad',
     'quantity': 'cantidad',
-    'Cantidad': 'cantidad',
-    'CANTIDAD': 'cantidad',
     'qty': 'cantidad',
-    'QTY': 'cantidad',
+    'cant': 'cantidad',
+    'stock': 'cantidad',
+    'unidades': 'cantidad',
+    'existencia': 'cantidad',
+    'existencias': 'cantidad',
+    'inventario': 'cantidad',
+    'disponible': 'cantidad',
+    
     // Variaciones de Costo
     'costo': 'costo',
     'cost': 'costo',
-    'Costo': 'costo',
-    'COSTO': 'costo',
     'precio_costo': 'costo',
-    'precio costo': 'costo',
+    'precio_compra': 'costo',
+    'costo_unitario': 'costo',
+    'compra': 'costo',
+    'p_compra': 'costo',
+    'pc': 'costo',
+    
     // Variaciones de Precio de Venta
     'precio_venta': 'precio_venta',
-    'precio venta': 'precio_venta',
-    'Precio Venta': 'precio_venta',
-    'Precio de Venta': 'precio_venta',
-    'PRECIO VENTA': 'precio_venta',
+    'precio_de_venta': 'precio_venta',
+    'precioventa': 'precio_venta',
     'precio': 'precio_venta',
     'price': 'precio_venta',
+    'venta': 'precio_venta',
+    'p_venta': 'precio_venta',
+    'pv': 'precio_venta',
+    'pvp': 'precio_venta',
     'sale_price': 'precio_venta',
-    'PrecioVenta': 'precio_venta',
+    'precio_publico': 'precio_venta',
+    'precio_unitario': 'precio_venta',
   };
+  
+  // Detectar las columnas del archivo y mapearlas
+  const firstRow = data[0];
+  const columnMap: Record<string, string> = {};
+  
+  Object.keys(firstRow).forEach(originalKey => {
+    const cleanKey = cleanColumnName(originalKey);
+    const mappedKey = columnMappings[cleanKey];
+    if (mappedKey) {
+      columnMap[originalKey] = mappedKey;
+    }
+  });
+  
+  // Si no encontramos las columnas básicas, intentar detección por posición
+  // (útil cuando copian datos sin headers o con headers genéricos)
+  const mappedColumns = Object.values(columnMap);
+  const hasMarca = mappedColumns.includes('marca');
+  const hasAmperaje = mappedColumns.includes('amperaje');
+  const hasCantidad = mappedColumns.includes('cantidad');
+  
+  // Si faltan columnas críticas, intentar asignar por orden típico
+  if (!hasMarca || !hasAmperaje) {
+    const keys = Object.keys(firstRow);
+    // Orden típico: Marca, Amperaje, Cantidad, Costo, Precio
+    if (keys.length >= 2 && !hasMarca) {
+      const firstKey = keys[0];
+      if (!columnMap[firstKey]) columnMap[firstKey] = 'marca';
+    }
+    if (keys.length >= 2 && !hasAmperaje) {
+      const secondKey = keys[1];
+      if (!columnMap[secondKey]) columnMap[secondKey] = 'amperaje';
+    }
+    if (keys.length >= 3 && !hasCantidad) {
+      const thirdKey = keys[2];
+      if (!columnMap[thirdKey]) columnMap[thirdKey] = 'cantidad';
+    }
+  }
   
   return data.map(row => {
     const normalizedRow: Record<string, unknown> = {};
     
     Object.entries(row).forEach(([key, value]) => {
-      // Limpiar el nombre de la columna
-      const cleanKey = key.trim();
+      // Usar el mapeo o mantener la clave original limpia
+      const normalizedKey = columnMap[key] || cleanColumnName(key);
       
-      // Buscar mapeo o usar el nombre limpio
-      const normalizedKey = columnMappings[cleanKey] || cleanKey;
-      
-      // Limpiar el valor si es string
-      let cleanValue = value;
-      if (typeof value === 'string') {
-        cleanValue = value.trim();
-        // Convertir números que vienen como string
-        if (/^-?\d+\.?\d*$/.test(cleanValue as string)) {
-          const num = parseFloat(cleanValue as string);
-          if (!isNaN(num)) cleanValue = num;
-        }
-      }
+      // Procesar el valor
+      let cleanValue = processValue(value);
       
       normalizedRow[normalizedKey] = cleanValue;
     });
     
     return normalizedRow;
+  }).filter(row => {
+    // Filtrar filas vacías o con solo valores nulos
+    const values = Object.values(row);
+    return values.some(v => v !== '' && v !== null && v !== undefined);
   });
+}
+
+/**
+ * Procesa un valor individual para limpiarlo y convertirlo al tipo correcto
+ */
+function processValue(value: unknown): unknown {
+  if (value === null || value === undefined) return '';
+  
+  if (typeof value === 'number') {
+    return isNaN(value) ? 0 : value;
+  }
+  
+  if (typeof value === 'string') {
+    let cleaned = value.trim();
+    
+    // Si está vacío después de limpiar
+    if (cleaned === '' || cleaned === '-' || cleaned === 'N/A' || cleaned === 'n/a') {
+      return '';
+    }
+    
+    // Quitar símbolos de moneda y separadores de miles
+    // Soporta: $1,234.56, $1.234,56, 1,234, 1.234
+    const currencyPattern = /^[$€Bs.]*\s*([\d.,]+)\s*$/;
+    const match = cleaned.match(currencyPattern);
+    if (match) {
+      cleaned = match[1];
+    }
+    
+    // Detectar formato numérico
+    // Si tiene coma como decimal (formato europeo/latino): 1.234,56
+    if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(cleaned)) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    // Si tiene punto como separador de miles y coma como decimal
+    else if (/^\d{1,3}(,\d{3})*(\.\d+)?$/.test(cleaned)) {
+      cleaned = cleaned.replace(/,/g, '');
+    }
+    // Formato simple con coma decimal: 123,45
+    else if (/^\d+(,\d+)?$/.test(cleaned) && cleaned.includes(',')) {
+      cleaned = cleaned.replace(',', '.');
+    }
+    
+    // Intentar convertir a número
+    if (/^-?\d+\.?\d*$/.test(cleaned)) {
+      const num = parseFloat(cleaned);
+      if (!isNaN(num)) return num;
+    }
+    
+    return cleaned;
+  }
+  
+  return value;
 }
 
 /**
@@ -492,5 +607,103 @@ export async function getFileInfo(file: File): Promise<{
     rowCount: data.length,
     columnCount: columns.length,
     columns
+  };
+}
+
+/**
+ * Valida datos de inventario y sugiere correcciones
+ * Útil para archivos copiados/pegados o creados manualmente
+ */
+export function validateInventoryData(data: Record<string, unknown>[]): {
+  isValid: boolean;
+  validRows: number;
+  invalidRows: number;
+  warnings: string[];
+  suggestions: string[];
+  detectedColumns: { original: string; mapped: string }[];
+} {
+  if (data.length === 0) {
+    return {
+      isValid: false,
+      validRows: 0,
+      invalidRows: 0,
+      warnings: ['El archivo está vacío'],
+      suggestions: ['Asegúrate de que el archivo tenga datos'],
+      detectedColumns: []
+    };
+  }
+  
+  const warnings: string[] = [];
+  const suggestions: string[] = [];
+  const detectedColumns: { original: string; mapped: string }[] = [];
+  
+  // Columnas requeridas para inventario
+  const requiredColumns = ['marca', 'amperaje', 'cantidad'];
+  const optionalColumns = ['costo', 'precio_venta'];
+  
+  // Analizar columnas detectadas
+  const firstRow = data[0];
+  const columns = Object.keys(firstRow);
+  
+  columns.forEach(col => {
+    const cleanCol = col.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '_');
+    
+    let mapped = '';
+    if (['marca', 'brand', 'nombre'].some(m => cleanCol.includes(m))) mapped = 'marca';
+    else if (['amperaje', 'amp', 'modelo', 'capacidad'].some(m => cleanCol.includes(m))) mapped = 'amperaje';
+    else if (['cantidad', 'qty', 'stock', 'existencia', 'unidades'].some(m => cleanCol.includes(m))) mapped = 'cantidad';
+    else if (['costo', 'cost', 'compra'].some(m => cleanCol.includes(m))) mapped = 'costo';
+    else if (['venta', 'precio', 'price', 'pvp'].some(m => cleanCol.includes(m))) mapped = 'precio_venta';
+    
+    detectedColumns.push({ original: col, mapped: mapped || '(no reconocida)' });
+  });
+  
+  // Verificar columnas requeridas
+  const mappedCols = detectedColumns.filter(d => d.mapped !== '(no reconocida)').map(d => d.mapped);
+  const missingRequired = requiredColumns.filter(r => !mappedCols.includes(r));
+  const missingOptional = optionalColumns.filter(o => !mappedCols.includes(o));
+  
+  if (missingRequired.length > 0) {
+    warnings.push(`Faltan columnas requeridas: ${missingRequired.join(', ')}`);
+    suggestions.push(`Agrega columnas con nombres como: ${missingRequired.map(m => 
+      m === 'marca' ? 'Marca, Brand, Nombre' :
+      m === 'amperaje' ? 'Amperaje, Amp, Modelo' :
+      'Cantidad, Stock, Qty'
+    ).join(' | ')}`);
+  }
+  
+  if (missingOptional.length > 0) {
+    suggestions.push(`Para mejores resultados, agrega: ${missingOptional.join(', ')}`);
+  }
+  
+  // Contar filas válidas/inválidas
+  let validRows = 0;
+  let invalidRows = 0;
+  
+  data.forEach((row, index) => {
+    const hasMarca = Object.values(row).some(v => v && String(v).trim() !== '');
+    if (hasMarca) {
+      validRows++;
+    } else {
+      invalidRows++;
+      if (invalidRows <= 3) {
+        warnings.push(`Fila ${index + 2} parece estar vacía o incompleta`);
+      }
+    }
+  });
+  
+  if (invalidRows > 3) {
+    warnings.push(`...y ${invalidRows - 3} filas más con problemas`);
+  }
+  
+  return {
+    isValid: missingRequired.length === 0 && validRows > 0,
+    validRows,
+    invalidRows,
+    warnings,
+    suggestions,
+    detectedColumns
   };
 }
