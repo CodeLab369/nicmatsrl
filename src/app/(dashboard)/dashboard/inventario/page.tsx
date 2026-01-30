@@ -432,13 +432,13 @@ export default function InventarioPage() {
     try {
       setIsAnalyzing(true);
       
-      // Validar tipo de archivo
-      const validTypes = ['.xlsx', '.xls', '.csv'];
+      // Validar tipo de archivo - Solo Excel y Google Sheets (exportado como Excel)
+      const validTypes = ['.xlsx', '.xls'];
       const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
       if (!validTypes.includes(fileExtension)) {
         toast({ 
           title: 'Archivo no válido', 
-          description: 'Solo se permiten archivos Excel (.xlsx, .xls) o CSV', 
+          description: 'Solo se permiten archivos Excel (.xlsx, .xls). Si usas Google Sheets, descárgalo como Excel.', 
           variant: 'destructive' 
         });
         setIsAnalyzing(false);

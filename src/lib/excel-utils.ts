@@ -1,18 +1,18 @@
 /**
  * Utilidades optimizadas para manejo de Excel y Google Sheets
  * Diseñado para alto rendimiento con grandes volúmenes de datos
- * Soporta: .xlsx, .xls, .csv, archivos exportados de Google Sheets
+ * Soporta: .xlsx, .xls (Excel y Google Sheets exportado como Excel)
  */
 
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-// Tipos de archivo soportados
-export type SupportedFileType = 'xlsx' | 'xls' | 'csv' | 'unknown';
+// Tipos de archivo soportados (solo Excel)
+export type SupportedFileType = 'xlsx' | 'xls' | 'unknown';
 
-// Configuración optimizada para XLSX
+// Configuración optimizada para XLSX - MÁXIMO RENDIMIENTO
 const XLSX_OPTIONS = {
-  // Opciones de lectura optimizadas
+  // Opciones de lectura ultra-optimizadas
   read: {
     type: 'array' as const,
     cellDates: false,      // No convertir fechas (más rápido)
@@ -20,13 +20,6 @@ const XLSX_OPTIONS = {
     cellText: false,       // No generar texto formateado
     cellFormula: false,    // No parsear fórmulas
     sheetStubs: false,     // No incluir celdas vacías
-    dense: true,           // Usar array denso (más eficiente en memoria)
-  },
-  // Opciones para CSV (Google Sheets exporta en este formato)
-  readCSV: {
-    type: 'string' as const,
-    raw: true,
-    codepage: 65001,       // UTF-8 para caracteres especiales
   },
   // Opciones de escritura optimizadas
   write: {
@@ -38,25 +31,23 @@ const XLSX_OPTIONS = {
 };
 
 /**
- * Detecta el tipo de archivo basado en la extensión y contenido
+ * Detecta el tipo de archivo basado en la extensión
  */
 export function detectFileType(file: File): SupportedFileType {
   const name = file.name.toLowerCase();
   if (name.endsWith('.xlsx')) return 'xlsx';
   if (name.endsWith('.xls')) return 'xls';
-  if (name.endsWith('.csv')) return 'csv';
   
   // Detectar por MIME type
   const type = file.type.toLowerCase();
   if (type.includes('spreadsheet') || type.includes('excel')) return 'xlsx';
-  if (type === 'text/csv' || type === 'application/csv') return 'csv';
   
   return 'unknown';
 }
 
 /**
- * Lee un archivo Excel o CSV de forma optimizada
- * Soporta: .xlsx, .xls, .csv (Google Sheets)
+ * Lee un archivo Excel de forma ultra-optimizada
+ * Soporta: .xlsx, .xls (Excel y Google Sheets exportado)
  * Compatible con tablets y dispositivos móviles
  * @param file - Archivo a leer (File o ArrayBuffer)
  * @returns Promise con los datos en formato JSON
@@ -66,21 +57,11 @@ export async function readExcelFast<T = Record<string, unknown>>(
 ): Promise<T[]> {
   return new Promise((resolve, reject) => {
     try {
-      const processData = (buffer: ArrayBuffer, isCSV = false) => {
+      const processData = (buffer: ArrayBuffer) => {
         try {
-          let workbook;
-          
-          if (isCSV) {
-            // Para CSV, convertir a string primero (mejor para Google Sheets)
-            const decoder = new TextDecoder('utf-8');
-            const csvString = decoder.decode(buffer);
-            workbook = XLSX.read(csvString, { type: 'string', raw: true });
-          } else {
-            // Para Excel, usar configuración optimizada
-            // Convertir ArrayBuffer a Uint8Array para mejor compatibilidad
-            const uint8Array = new Uint8Array(buffer);
-            workbook = XLSX.read(uint8Array, { type: 'array' });
-          }
+          // Convertir ArrayBuffer a Uint8Array para mejor compatibilidad
+          const uint8Array = new Uint8Array(buffer);
+          const workbook = XLSX.read(uint8Array, XLSX_OPTIONS.read);
           
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
@@ -91,27 +72,24 @@ export async function readExcelFast<T = Record<string, unknown>>(
             defval: '',       // Valor por defecto para celdas vacías
           });
           
-          // Normalizar datos (útil para Google Sheets que puede tener headers diferentes)
+          // Normalizar datos para compatibilidad con diferentes fuentes
           const normalizedData = normalizeSheetData(data as Record<string, unknown>[]) as T[];
           
           resolve(normalizedData);
         } catch (parseError) {
           console.error('Error parsing file:', parseError);
-          reject(new Error('Error al procesar el archivo. Verifica que sea un archivo Excel o CSV válido.'));
+          reject(new Error('Error al procesar el archivo. Verifica que sea un archivo Excel válido (.xlsx o .xls)'));
         }
       };
 
       if (file instanceof File) {
-        const isCSV = file.name.toLowerCase().endsWith('.csv') || 
-                      file.type === 'text/csv';
-        
-        // Usar FileReader como fallback para mejor compatibilidad con tablets
+        // Usar FileReader para mejor compatibilidad con tablets
         const reader = new FileReader();
         
         reader.onload = (e) => {
           const result = e.target?.result;
           if (result instanceof ArrayBuffer) {
-            processData(result, isCSV);
+            processData(result);
           } else {
             reject(new Error('Error al leer el archivo'));
           }
@@ -121,7 +99,6 @@ export async function readExcelFast<T = Record<string, unknown>>(
           reject(new Error('Error al leer el archivo. Intenta seleccionarlo de nuevo.'));
         };
         
-        // readAsArrayBuffer tiene mejor soporte que arrayBuffer() en tablets
         reader.readAsArrayBuffer(file);
       } else {
         processData(file);
@@ -133,8 +110,7 @@ export async function readExcelFast<T = Record<string, unknown>>(
 }
 
 /**
- * Lee específicamente un archivo de Google Sheets (CSV o XLSX exportado)
- * Maneja las peculiaridades de los archivos de Google Sheets
+ * Lee un archivo de Google Sheets (exportado como Excel)
  */
 export async function readGoogleSheet<T = Record<string, unknown>>(
   file: File
@@ -480,73 +456,18 @@ export function validateExcelStructure(
 }
 
 /**
- * Exporta datos a CSV (compatible con Google Sheets)
- * @param data - Array de objetos a exportar
- * @param fileName - Nombre del archivo (sin extensión)
- */
-export function exportToCSV(
-  data: Record<string, unknown>[],
-  fileName: string
-): void {
-  if (data.length === 0) return;
-  
-  // Crear worksheet
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  
-  // Generar CSV con BOM para UTF-8 (importante para caracteres especiales en Google Sheets)
-  const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-  const BOM = '\uFEFF';
-  
-  // Descargar
-  const blob = new Blob([BOM + csvContent], { 
-    type: 'text/csv;charset=utf-8;' 
-  });
-  saveAs(blob, `${fileName}.csv`);
-}
-
-/**
- * Crea una plantilla en formato CSV (para Google Sheets)
- */
-export function createCSVTemplate(
-  headers: string[],
-  fileName: string
-): void {
-  const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-  const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-  const BOM = '\uFEFF';
-  
-  const blob = new Blob([BOM + csvContent], { 
-    type: 'text/csv;charset=utf-8;' 
-  });
-  saveAs(blob, `${fileName}.csv`);
-}
-
-/**
- * Exporta datos con opción de formato (Excel o CSV para Google Sheets)
- */
-export function exportToSpreadsheet(
-  data: Record<string, unknown>[],
-  fileName: string,
-  format: 'excel' | 'csv' | 'google-sheets' = 'excel',
-  sheetName = 'Datos'
-): void {
-  if (format === 'csv' || format === 'google-sheets') {
-    exportToCSV(data, fileName);
-  } else {
-    exportToExcelFast(data, fileName, sheetName);
-  }
-}
-
-/**
- * Lee múltiples hojas de un archivo Excel/Google Sheets
+ * Lee múltiples hojas de un archivo Excel
  */
 export async function readAllSheets<T = Record<string, unknown>>(
   file: File
 ): Promise<{ [sheetName: string]: T[] }> {
   return new Promise((resolve, reject) => {
-    file.arrayBuffer()
-      .then(buffer => {
-        const workbook = XLSX.read(buffer, XLSX_OPTIONS.read);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const uint8Array = new Uint8Array(buffer);
+        const workbook = XLSX.read(uint8Array, XLSX_OPTIONS.read);
         const result: { [sheetName: string]: T[] } = {};
         
         workbook.SheetNames.forEach(sheetName => {
@@ -558,8 +479,12 @@ export async function readAllSheets<T = Record<string, unknown>>(
         });
         
         resolve(result);
-      })
-      .catch(reject);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('Error al leer el archivo'));
+    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -577,37 +502,42 @@ export async function getFileInfo(file: File): Promise<{
   columns: string[];
 }> {
   const fileType = detectFileType(file);
-  const buffer = await file.arrayBuffer();
   
-  let workbook;
-  if (fileType === 'csv') {
-    const decoder = new TextDecoder('utf-8');
-    const csvString = decoder.decode(buffer);
-    workbook = XLSX.read(csvString, { type: 'string' });
-  } else {
-    workbook = XLSX.read(buffer, { type: 'array' });
-  }
-  
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet);
-  const columns = data.length > 0 ? Object.keys(data[0]) : [];
-  
-  // Formatear tamaño de archivo
-  const sizeInKB = file.size / 1024;
-  const fileSize = sizeInKB > 1024 
-    ? `${(sizeInKB / 1024).toFixed(2)} MB` 
-    : `${sizeInKB.toFixed(2)} KB`;
-  
-  return {
-    fileName: file.name,
-    fileType,
-    fileSize,
-    sheetCount: workbook.SheetNames.length,
-    sheetNames: workbook.SheetNames,
-    rowCount: data.length,
-    columnCount: columns.length,
-    columns
-  };
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const uint8Array = new Uint8Array(buffer);
+        const workbook = XLSX.read(uint8Array, XLSX_OPTIONS.read);
+        
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet);
+        const columns = data.length > 0 ? Object.keys(data[0]) : [];
+        
+        // Formatear tamaño de archivo
+        const sizeInKB = file.size / 1024;
+        const fileSize = sizeInKB > 1024 
+          ? `${(sizeInKB / 1024).toFixed(2)} MB` 
+          : `${sizeInKB.toFixed(2)} KB`;
+        
+        resolve({
+          fileName: file.name,
+          fileType,
+          fileSize,
+          sheetCount: workbook.SheetNames.length,
+          sheetNames: workbook.SheetNames,
+          rowCount: data.length,
+          columnCount: columns.length,
+          columns
+        });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('Error al leer el archivo'));
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 /**
