@@ -146,12 +146,10 @@ export default function InventarioPage() {
         params.set('cantidadVal', cantidadVal);
       }
 
-      console.log('📦 [Inventario] Cargando datos...', { showLoading, page, limit });
       const response = await fetch(`/api/inventory?${params}`);
       const data = await response.json();
 
       if (data.items) {
-        console.log('✅ [Inventario] Datos recibidos:', data.items.length, 'items');
         setItems(data.items);
         setTotal(data.total);
         setTotalPages(data.totalPages);
@@ -184,7 +182,6 @@ export default function InventarioPage() {
   // Suscripción a Realtime centralizada - actualización SILENCIOSA sin spinner
   // Usa refs para siempre tener la versión más reciente de las funciones
   const isRealtime = useTableSubscription('inventory', () => {
-    console.log('🔄 [Inventario] Realtime detectó cambio, actualizando sin spinner...');
     fetchInventoryRef.current(false); // false = sin mostrar el icono de carga
     fetchMarcasRef.current();
   });
