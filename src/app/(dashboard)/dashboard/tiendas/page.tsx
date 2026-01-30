@@ -3798,7 +3798,7 @@ export default function TiendasPage() {
                   <div className="col-span-3">
                     <Label className="text-xs">Marca</Label>
                     <Input
-                      placeholder="Ej: BOSCH"
+                      placeholder="Ingrese marca"
                       value={newSaldoItem.marca}
                       onChange={(e) => setNewSaldoItem(prev => ({ ...prev, marca: e.target.value.toUpperCase() }))}
                       className="h-9"
@@ -3807,7 +3807,7 @@ export default function TiendasPage() {
                   <div className="col-span-3">
                     <Label className="text-xs">Amperaje</Label>
                     <Input
-                      placeholder="Ej: 60AH"
+                      placeholder="Ingrese amperaje"
                       value={newSaldoItem.amperaje}
                       onChange={(e) => setNewSaldoItem(prev => ({ ...prev, amperaje: e.target.value.toUpperCase() }))}
                       className="h-9"
