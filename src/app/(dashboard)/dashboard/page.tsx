@@ -309,8 +309,8 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={marcasData} layout="vertical" margin={{ left: 0, right: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tick={{ fontSize: 12 }} />
@@ -353,8 +353,8 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={cotizacionesEstado}
