@@ -61,6 +61,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch('/api/alerts');
+      if (!response.ok) return;
+      
       const data = await response.json();
       
       if (data.stockBajo?.productos) {
@@ -102,6 +104,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch('/api/cotizaciones');
+      if (!response.ok) return;
+      
       const data = await response.json();
       
       if (data.cotizaciones) {
@@ -175,6 +179,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch('/api/tienda-envios');
+      if (!response.ok) return; // Silenciosamente ignorar errores de API
+      
       const data = await response.json();
       
       if (data.envios) {
@@ -203,6 +209,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch('/api/users');
+      if (!response.ok) return;
+      
       const data = await response.json();
       
       if (data.users) {

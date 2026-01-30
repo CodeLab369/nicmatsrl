@@ -39,16 +39,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ envio, items });
     }
 
-    // Listar envíos de una tienda
-    if (!tiendaId) {
-      return NextResponse.json({ error: 'tiendaId es requerido' }, { status: 400 });
-    }
-
+    // Listar envíos - con o sin tiendaId
     let query = supabase
       .from('tienda_envios')
-      .select('*')
-      .eq('tienda_id', tiendaId)
+      .select(`
+        *,
+        tiendas:tienda_id (nombre)
+      `)
       .order('created_at', { ascending: false });
+
+    // Filtrar por tienda si se proporciona
+    if (tiendaId) {
+      query = query.eq('tienda_id', tiendaId);
+    }
 
     if (estado && estado !== '_all') {
       query = query.eq('estado', estado);
@@ -58,7 +61,13 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ envios });
+    // Mapear para incluir nombre de tienda
+    const enviosConTienda = (envios || []).map(e => ({
+      ...e,
+      tienda_nombre: e.tiendas?.nombre || 'Tienda'
+    }));
+
+    return NextResponse.json({ envios: enviosConTienda });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Error al obtener envíos' }, { status: 500 });
