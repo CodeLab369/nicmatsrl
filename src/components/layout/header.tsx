@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import { Sidebar } from './sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationBell } from './notification-bell';
 import Link from 'next/link';
 
 export function Header() {
@@ -64,9 +65,10 @@ export function Header() {
             {/* Espacio reservado para breadcrumbs o título dinámico */}
           </div>
 
-          {/* Toggle de tema y Usuario */}
+          {/* Toggle de tema, Notificaciones y Usuario */}
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <NotificationBell />
             
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
