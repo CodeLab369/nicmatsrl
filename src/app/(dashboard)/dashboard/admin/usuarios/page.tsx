@@ -123,9 +123,7 @@ export default function UsersPage() {
         description: SUCCESS_MESSAGES.DELETED,
         variant: 'success',
       });
-      
-      // Recargar lista
-      fetchUsers();
+      // No llamamos fetchUsers() - Realtime lo actualizará automáticamente
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({

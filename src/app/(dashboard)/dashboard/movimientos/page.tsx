@@ -311,8 +311,14 @@ export default function MovimientosPage() {
   }, [fetchResumen]);
 
   // Realtime: actualizar cuando cambien ventas, gastos o cotizaciones
-  useTableSubscription('tienda_ventas', fetchResumen);
-  useTableSubscription('tienda_gastos', fetchResumen);
+  useTableSubscription('tienda_ventas', () => {
+    fetchResumen();
+    if (selectedTienda) fetchVentas();
+  });
+  useTableSubscription('tienda_gastos', () => {
+    fetchResumen();
+    if (selectedTienda) fetchGastos();
+  });
   useTableSubscription('cotizaciones', fetchResumen);
   useTableSubscription('tienda_inventario', fetchResumen);
 
@@ -392,7 +398,7 @@ export default function MovimientosPage() {
 
       toast({ title: 'Venta registrada', description: data.message, variant: 'success' });
       setRegistrarVentaOpen(false);
-      fetchVentas();
+      // No llamamos fetchVentas() - Realtime lo actualizará automáticamente
       fetchResumen();
     } catch (error) {
       toast({
@@ -420,7 +426,7 @@ export default function MovimientosPage() {
       toast({ title: 'Venta eliminada', description: data.message, variant: 'success' });
       setDeleteVentaDialogOpen(false);
       setVentaToDelete(null);
-      fetchVentas();
+      // No llamamos fetchVentas() - Realtime lo actualizará automáticamente
       fetchResumen();
     } catch (error) {
       toast({
@@ -472,7 +478,7 @@ export default function MovimientosPage() {
       toast({ title: 'Gasto registrado', description: data.message, variant: 'success' });
       setAgregarGastoOpen(false);
       setGastoForm({ categoria: '', categoriaOtro: '', descripcion: '', monto: '', fecha: '' });
-      fetchGastos();
+      // No llamamos fetchGastos() - Realtime lo actualizará automáticamente
       fetchResumen();
       fetchCategorias();
     } catch (error) {
@@ -501,7 +507,7 @@ export default function MovimientosPage() {
       toast({ title: 'Gasto eliminado', description: data.message, variant: 'success' });
       setDeleteGastoDialogOpen(false);
       setGastoToDelete(null);
-      fetchGastos();
+      // No llamamos fetchGastos() - Realtime lo actualizará automáticamente
       fetchResumen();
     } catch (error) {
       toast({

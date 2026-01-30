@@ -426,7 +426,7 @@ export default function TiendasPage() {
       });
       
       handleCancelForm();
-      fetchTiendas();
+      // No llamamos fetchTiendas() - Realtime lo actualizará automáticamente
     } catch {
       toast({ title: 'Error', description: 'No se pudo guardar', variant: 'destructive' });
     } finally {
@@ -459,7 +459,7 @@ export default function TiendasPage() {
       if (selectedTienda?.id === tiendaToDelete.id) {
         setSelectedTienda(null);
       }
-      fetchTiendas();
+      // No llamamos fetchTiendas() - Realtime lo actualizará automáticamente
     } catch {
       toast({ title: 'Error', description: 'No se pudo eliminar', variant: 'destructive' });
     }
@@ -669,7 +669,7 @@ export default function TiendasPage() {
       });
 
       setTransferDialogOpen(false);
-      fetchEnviosPendientes();
+      // No llamamos fetchEnviosPendientes() - Realtime lo actualizará automáticamente
     } catch (error) {
       toast({ 
         title: 'Error', 
@@ -741,8 +741,7 @@ export default function TiendasPage() {
         variant: data.todosConPrecio ? 'success' : 'default' 
       });
 
-      // Actualizar la lista y el detalle
-      fetchEnviosPendientes();
+      // Actualizar el detalle si está abierto - Realtime actualizará la lista
       if (selectedEnvio?.id === envioId) {
         fetchEnvioDetail(envioId);
       }
@@ -793,9 +792,8 @@ export default function TiendasPage() {
         variant: 'success' 
       });
 
-      // Limpiar ediciones y recargar
+      // Limpiar ediciones - Realtime actualizará la lista
       setEditedPrices({});
-      fetchEnviosPendientes();
       fetchEnvioDetail(selectedEnvio.id);
     } catch (error) {
       toast({ 
@@ -877,8 +875,7 @@ export default function TiendasPage() {
 
       setEnvioDetailOpen(false);
       setSelectedEnvio(null);
-      fetchEnviosPendientes();
-      fetchTiendaInventory();
+      // No llamamos fetchEnviosPendientes()/fetchTiendaInventory() - Realtime lo actualizará automáticamente
     } catch (error) {
       toast({ 
         title: 'Error', 
@@ -915,7 +912,7 @@ export default function TiendasPage() {
         setEnvioDetailOpen(false);
         setSelectedEnvio(null);
       }
-      fetchEnviosPendientes();
+      // No llamamos fetchEnviosPendientes() - Realtime lo actualizará automáticamente
     } catch (error) {
       toast({ 
         title: 'Error', 
@@ -2402,7 +2399,7 @@ export default function TiendasPage() {
       setSaldosDialogOpen(false);
       setSaldosAnalysis(null);
       setSaldosFile(null);
-      fetchTiendaInventory();
+      // No llamamos fetchTiendaInventory() - Realtime lo actualizará automáticamente
     } catch (error) {
       toast({ 
         title: 'Error', 
@@ -2477,7 +2474,7 @@ export default function TiendasPage() {
       setSaldosDialogOpen(false);
       setManualSaldoItems([]);
       setSaldosMode('import');
-      fetchTiendaInventory();
+      // No llamamos fetchTiendaInventory() - Realtime lo actualizará automáticamente
     } catch (error) {
       toast({ 
         title: 'Error', 

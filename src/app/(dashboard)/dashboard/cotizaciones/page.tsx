@@ -456,7 +456,7 @@ export default function CotizacionesPage() {
       handleLimpiar();
       setShowForm(false);
       setEditingCotizacion(null);
-      fetchCotizaciones();
+      // No llamamos fetchCotizaciones() - Realtime lo actualizará automáticamente
       fetchStats();
       fetchClientes();
     } catch {
@@ -484,7 +484,7 @@ export default function CotizacionesPage() {
       };
       
       toast({ title: 'Éxito', description: mensajes[nuevoEstado] || 'Estado actualizado', variant: 'success' });
-      fetchCotizaciones();
+      // No llamamos fetchCotizaciones() - Realtime lo actualizará automáticamente
       fetchStats();
       fetchClientes();
     } catch {
@@ -550,8 +550,7 @@ export default function CotizacionesPage() {
         description: `Se restó ${cot.total_unidades} unidades del inventario`, 
         variant: 'success' 
       });
-      
-      fetchCotizaciones();
+      // No llamamos fetchCotizaciones() - Realtime lo actualizará automáticamente
       fetchStats();
       fetchInventario();
     } catch (error) {
@@ -577,7 +576,7 @@ export default function CotizacionesPage() {
       toast({ title: 'Éxito', description: 'Cotización eliminada', variant: 'success' });
       setDeleteDialogOpen(false);
       setSelectedCotizacion(null);
-      fetchCotizaciones();
+      // No llamamos fetchCotizaciones() - Realtime lo actualizará automáticamente
       fetchStats();
     } catch {
       toast({ title: 'Error', description: 'No se pudo eliminar', variant: 'destructive' });
