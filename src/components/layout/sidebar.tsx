@@ -105,7 +105,7 @@ const navigation: NavGroup[] = [
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { isConnected, connectionStatus, lastEvent } = useRealtimeContext();
+  const { isConnected } = useRealtimeContext();
 
   const isActiveLink = (href: string) => {
     if (href === ROUTES.DASHBOARD) {
@@ -184,31 +184,21 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       {/* Footer del sidebar */}
       <div className="px-6 py-4 border-t">
-        {/* Indicador de conexión en tiempo real */}
-        <div className="flex flex-col items-center gap-1 mb-2">
-          <div className="flex items-center gap-2">
-            {isConnected ? (
-              <>
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                </span>
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium">En vivo</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                <span className="text-xs text-amber-600 dark:text-amber-400">
-                  {connectionStatus === 'INITIALIZING' ? 'Conectando...' : 
-                   connectionStatus === 'CLOSED' ? 'Desconectado' : connectionStatus}
-                </span>
-              </>
-            )}
-          </div>
-          {lastEvent && (
-            <span className="text-[10px] text-muted-foreground">
-              Último: {lastEvent.table} ({lastEvent.type})
-            </span>
+        {/* Indicador de conexión */}
+        <div className="flex items-center justify-center gap-2 mb-2">
+          {isConnected ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-xs text-green-600 dark:text-green-400 font-medium">En vivo</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3 h-3 text-amber-500" />
+              <span className="text-xs text-amber-600 dark:text-amber-400">Conectando...</span>
+            </>
           )}
         </div>
         <p className="text-xs text-muted-foreground text-center">

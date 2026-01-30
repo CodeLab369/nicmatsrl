@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, RefreshCw, Circle, Package, Store, FileText, BarChart3, TrendingUp } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Shield, User as UserIcon, Circle, Package, Store, FileText, BarChart3, TrendingUp } from 'lucide-react';
 import { useAuth, useTableSubscription } from '@/contexts';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types';
@@ -77,7 +77,7 @@ export default function UsersPage() {
   }, [fetchUsers]);
 
   // Realtime centralizado para usuarios y presencia
-  const isConnected = useTableSubscription('users', fetchUsers);
+  useTableSubscription('users', fetchUsers);
   useTableSubscription('user_presence', fetchUsers);
 
   // Filtrar usuarios con useMemo
@@ -225,10 +225,6 @@ export default function UsersPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-500' : 'text-muted-foreground'}`}>
-            <RefreshCw className={`h-3 w-3 ${isConnected ? '' : 'animate-spin'}`} />
-            {isConnected ? 'Tiempo real' : 'Conectando...'}
-          </div>
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Usuario

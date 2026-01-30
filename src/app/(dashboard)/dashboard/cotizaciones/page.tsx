@@ -236,7 +236,7 @@ export default function CotizacionesPage() {
   }, [fetchCotizaciones, fetchStats, fetchInventario, fetchEmpresaConfig, fetchClientes]);
 
   // Suscripción a Realtime centralizada - cotizaciones
-  const isConnectedCot = useTableSubscription('cotizaciones', () => {
+  useTableSubscription('cotizaciones', () => {
     fetchCotizaciones();
     fetchStats();
   });
@@ -245,9 +245,6 @@ export default function CotizacionesPage() {
   useTableSubscription('empresa_config', () => {
     fetchEmpresaConfig();
   });
-  
-  // Usar el estado de conexión de cotizaciones
-  const isConnected = isConnectedCot;
 
   // Actualizar amperajes cuando cambia la marca
   useEffect(() => {
@@ -1068,10 +1065,6 @@ export default function CotizacionesPage() {
           <p className="text-muted-foreground">Crea y gestiona cotizaciones para tus clientes</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-500' : 'text-muted-foreground'}`}>
-            {isConnected ? <RefreshCw className="h-3 w-3" /> : <RefreshCw className="h-3 w-3" />}
-            {isConnected ? 'Conectado' : 'Sin conexión'}
-          </div>
           <Button variant="outline" onClick={() => { setConfigForm(empresaConfig); setConfigDialogOpen(true); }}>
             <Settings className="mr-2 h-4 w-4" />
             Configurar

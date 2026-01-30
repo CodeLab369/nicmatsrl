@@ -385,7 +385,7 @@ export default function TiendasPage() {
   }, [tiendaFilterAmperaje]);
 
   // Suscripción Realtime
-  const isConnected = useTableSubscription('tiendas', fetchTiendas);
+  useTableSubscription('tiendas', fetchTiendas);
   useTableSubscription('tienda_inventario', () => {
     if (selectedTienda) fetchTiendaInventory();
   });
@@ -2568,10 +2568,6 @@ export default function TiendasPage() {
           <p className="text-muted-foreground">Gestiona tus tiendas y su inventario</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-500' : 'text-muted-foreground'}`}>
-            <RefreshCw className="h-3 w-3" />
-            {isConnected ? 'Conectado' : 'Sin conexión'}
-          </div>
           <Button variant="outline" onClick={() => { setConfigForm(empresaConfig); setConfigDialogOpen(true); }}>
             <Settings className="mr-2 h-4 w-4" />
             Configurar PDF

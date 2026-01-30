@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
-  ChevronLeft, ChevronRight, X, Wifi, WifiOff, RefreshCw, AlertCircle, ArrowRight
+  ChevronLeft, ChevronRight, X, RefreshCw, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -499,20 +499,9 @@ export default function InventarioPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
-            <p className="text-muted-foreground">Gestiona el inventario de baterías</p>
-          </div>
-          {/* Indicador de tiempo real */}
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
-            isRealtime 
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-          }`}>
-            {isRealtime ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {isRealtime ? 'En vivo' : 'Conectando...'}
-          </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Inventario</h1>
+          <p className="text-muted-foreground">Gestiona el inventario de baterías</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => { setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' }); setAddDialogOpen(true); }}>
