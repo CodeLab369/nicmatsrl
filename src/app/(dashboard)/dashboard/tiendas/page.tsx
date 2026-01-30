@@ -231,10 +231,10 @@ export default function TiendasPage() {
   
   const { toast } = useToast();
 
-  // Fetch tiendas
-  const fetchTiendas = useCallback(async () => {
+  // Fetch tiendas (showLoading=false para actualizaciones silenciosas de Realtime)
+  const fetchTiendas = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
@@ -253,16 +253,16 @@ export default function TiendasPage() {
     } catch (error) {
       console.error('Error:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [page, limit, filterTipo, filterCiudad]);
 
-  // Fetch inventario de tienda seleccionada
-  const fetchTiendaInventory = useCallback(async () => {
+  // Fetch inventario de tienda seleccionada (showLoading=false para actualizaciones silenciosas)
+  const fetchTiendaInventory = useCallback(async (showLoading = true) => {
     if (!selectedTienda) return;
     
     try {
-      setLoadingTiendaInv(true);
+      if (showLoading) setLoadingTiendaInv(true);
       const params = new URLSearchParams({
         tiendaId: selectedTienda.id,
         page: tiendaPage.toString(),
@@ -283,7 +283,7 @@ export default function TiendasPage() {
     } catch (error) {
       console.error('Error:', error);
     } finally {
-      setLoadingTiendaInv(false);
+      if (showLoading) setLoadingTiendaInv(false);
     }
   }, [selectedTienda, tiendaPage, tiendaLimit, tiendaFilterMarca, tiendaFilterAmperaje]);
 
@@ -384,10 +384,10 @@ export default function TiendasPage() {
     setTiendaPage(1);
   }, [tiendaFilterAmperaje]);
 
-  // Suscripción Realtime
-  useTableSubscription('tiendas', fetchTiendas);
+  // Suscripción Realtime - actualizaciones silenciosas sin spinner
+  useTableSubscription('tiendas', () => fetchTiendas(false));
   useTableSubscription('tienda_inventario', () => {
-    if (selectedTienda) fetchTiendaInventory();
+    if (selectedTienda) fetchTiendaInventory(false);
   });
   useTableSubscription('inventory', () => {
     if (transferDialogOpen) fetchInventarioCentral();
