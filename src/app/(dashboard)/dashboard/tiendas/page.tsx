@@ -3512,51 +3512,54 @@ export default function TiendasPage() {
           </div>
 
           <DialogFooter className="mt-4 border-t pt-4">
-            <div className="flex flex-col w-full gap-2">
-              <Button variant="ghost" onClick={() => { setEnvioDetailOpen(false); setEditedPrices({}); }} className="w-full">
+            <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+              <Button variant="ghost" size="sm" onClick={() => { setEnvioDetailOpen(false); setEditedPrices({}); }}>
                 Cerrar
               </Button>
-              <label className="cursor-pointer w-full">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file && selectedEnvio) {
-                      handleImportEnvio(selectedEnvio.id, file);
-                      setEditedPrices({});
-                    }
-                    e.target.value = '';
-                  }}
-                  disabled={isImporting || selectedEnvio?.estado === 'completado'}
-                />
-                <Button variant="outline" className="gap-2 w-full" asChild disabled={isImporting || selectedEnvio?.estado === 'completado'}>
-                  <span>
-                    <Upload className="h-4 w-4" />
-                    {isImporting ? 'Importando...' : 'Importar Precios'}
-                  </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && selectedEnvio) {
+                        handleImportEnvio(selectedEnvio.id, file);
+                        setEditedPrices({});
+                      }
+                      e.target.value = '';
+                    }}
+                    disabled={isImporting || selectedEnvio?.estado === 'completado'}
+                  />
+                  <Button variant="outline" size="sm" className="gap-1.5" asChild disabled={isImporting || selectedEnvio?.estado === 'completado'}>
+                    <span>
+                      <Upload className="h-4 w-4" />
+                      Importar Precios
+                    </span>
+                  </Button>
+                </label>
+                <Button variant="outline" size="sm" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-1.5">
+                  <Download className="h-4 w-4" />
+                  Exportar Excel
                 </Button>
-              </label>
-              <Button variant="outline" onClick={() => selectedEnvio && handleExportEnvio(selectedEnvio.id)} className="gap-2 w-full">
-                <Download className="h-4 w-4" />
-                Exportar Excel
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => selectedEnvio && selectedTienda && handlePrintEnvio(selectedEnvio, envioItems, selectedTienda)} 
-                className="gap-2 w-full"
-                disabled={loadingEnvioItems || envioItems.length === 0}
-              >
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectedEnvio && selectedTienda && handlePrintEnvio(selectedEnvio, envioItems, selectedTienda)} 
+                  className="gap-1.5"
+                  disabled={loadingEnvioItems || envioItems.length === 0}
+                >
                 <Printer className="h-4 w-4" />
                 Imprimir PDF
               </Button>
               {(selectedEnvio?.estado === 'precios_asignados' || 
                 (selectedEnvio?.estado === 'pendiente' && envioItems.every(i => (editedPrices[i.id] !== undefined) || i.precio_tienda !== null))) && (
                 <Button 
+                  size="sm"
                   onClick={() => selectedEnvio && handleConfirmEnvio(selectedEnvio.id)} 
                   disabled={isConfirming || Object.keys(editedPrices).length > 0}
-                  className="gap-2 w-full"
+                  className="gap-1.5"
                   title={Object.keys(editedPrices).length > 0 ? 'Guarda los precios primero' : ''}
                 >
                   {isConfirming ? (
@@ -3572,6 +3575,7 @@ export default function TiendasPage() {
                   )}
                 </Button>
               )}
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>
