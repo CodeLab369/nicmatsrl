@@ -7,7 +7,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// GET - Exportar envío a Excel
+// Configuración optimizada para XLSX
+const XLSX_READ_OPTIONS = {
+  type: 'array' as const,
+  cellDates: false,
+  cellNF: false,
+  cellText: false,
+  cellFormula: false,
+  sheetStubs: false,
+};
+
+const XLSX_WRITE_OPTIONS = {
+  type: 'buffer' as const,
+  bookType: 'xlsx' as const,
+  compression: true,
+};
+
+// GET - Exportar envío a Excel (OPTIMIZADO)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -71,8 +87,8 @@ export async function GET(request: NextRequest) {
     const tiendaNombre = (envio.tiendas as { nombre: string })?.nombre || 'Tienda';
     XLSX.utils.book_append_sheet(wb, ws, 'Envio');
 
-    // Generar el archivo
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    // Generar el archivo con compresión
+    const buffer = XLSX.write(wb, XLSX_WRITE_OPTIONS);
 
     // Crear nombre de archivo
     const fecha = new Date().toISOString().split('T')[0];
@@ -117,9 +133,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se puede modificar un envío completado' }, { status: 400 });
     }
 
-    // Leer el archivo Excel
+    // Leer el archivo Excel con opciones optimizadas
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = XLSX.read(arrayBuffer, XLSX_READ_OPTIONS);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<{

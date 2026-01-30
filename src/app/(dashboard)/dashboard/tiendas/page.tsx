@@ -11,6 +11,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
+import { readExcelFast, exportToExcelFast, createExcelTemplate } from '@/lib/excel-utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
   Input, Badge, Dialog, DialogContent, DialogDescription,
@@ -522,14 +523,11 @@ export default function TiendasPage() {
     }
   };
 
-  // Exportar inventario de tienda a Excel (lazy load XLSX)
+  // Exportar inventario de tienda a Excel - OPTIMIZADO
   const handleExportTiendaInventory = async () => {
     if (!selectedTienda) return;
 
     try {
-      // Importar XLSX dinámicamente solo cuando se necesita
-      const XLSX = await import('xlsx');
-      
       // Obtener TODOS los items de la tienda (sin paginación)
       const response = await fetch(`/api/tienda-inventario?tiendaId=${selectedTienda.id}&limit=10000`);
       const data = await response.json();
@@ -547,34 +545,18 @@ export default function TiendasPage() {
       
       // Preparar datos para Excel
       const excelData = sortedItems.map((item: TiendaInventoryItem) => ({
-        'Marca': item.marca,
-        'Amperaje': item.amperaje,
-        'Cantidad': item.cantidad,
+        Marca: item.marca,
+        Amperaje: item.amperaje,
+        Cantidad: item.cantidad,
         'Precio de Venta': item.precio_venta
       }));
 
-      // Crear workbook y worksheet
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelData);
-
-      // Ajustar anchos de columna
-      ws['!cols'] = [
-        { wch: 20 }, // Marca
-        { wch: 15 }, // Amperaje
-        { wch: 12 }, // Cantidad
-        { wch: 15 }, // Precio de Venta
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
-
-      // Generar nombre de archivo
-      const fileName = `Inventario_${selectedTienda.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-
-      // Descargar
-      XLSX.writeFile(wb, fileName);
+      // Exportar usando función optimizada
+      const fileName = `Inventario_${selectedTienda.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+      exportToExcelFast(excelData, fileName, 'Inventario');
 
       toast({ title: 'Exportado', description: `Se exportaron ${data.items.length} productos`, variant: 'success' });
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'Error al exportar', variant: 'destructive' });
     }
   };
@@ -2294,7 +2276,7 @@ export default function TiendasPage() {
     `;
   };
 
-  // Analizar archivo de saldos anteriores
+  // Analizar archivo de saldos anteriores - OPTIMIZADO
   const handleAnalyzeSaldos = async (file: File) => {
     if (!selectedTienda) return;
 
@@ -2302,19 +2284,16 @@ export default function TiendasPage() {
       setIsAnalyzingSaldos(true);
       setSaldosFile(file);
 
-      const XLSX = await import('xlsx');
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(ws);
+      // Usar lectura optimizada
+      const jsonData = await readExcelFast<Record<string, unknown>>(file);
 
       // Normalizar datos del Excel
-      const productos = jsonData.map((row: any) => ({
-        marca: row['Marca'] || row['marca'] || '',
+      const productos = jsonData.map((row) => ({
+        marca: (row['Marca'] || row['marca'] || '') as string,
         amperaje: String(row['Amperaje'] || row['amperaje'] || ''),
-        cantidad: parseInt(row['Cantidad'] || row['cantidad'] || 0),
-        precio_venta: parseFloat(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0),
-      })).filter((p: any) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
+        cantidad: parseInt(String(row['Cantidad'] || row['cantidad'] || 0)),
+        precio_venta: parseFloat(String(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0)),
+      })).filter((p) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
 
       if (productos.length === 0) {
         toast({ 
@@ -2356,25 +2335,22 @@ export default function TiendasPage() {
     }
   };
 
-  // Importar saldos anteriores
+  // Importar saldos anteriores - OPTIMIZADO
   const handleImportSaldos = async () => {
     if (!selectedTienda || !saldosFile) return;
 
     try {
       setIsImportingSaldos(true);
 
-      const XLSX = await import('xlsx');
-      const data = await saldosFile.arrayBuffer();
-      const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(ws);
+      // Usar lectura optimizada
+      const jsonData = await readExcelFast<Record<string, unknown>>(saldosFile);
 
-      const productos = jsonData.map((row: any) => ({
-        marca: row['Marca'] || row['marca'] || '',
+      const productos = jsonData.map((row) => ({
+        marca: (row['Marca'] || row['marca'] || '') as string,
         amperaje: String(row['Amperaje'] || row['amperaje'] || ''),
-        cantidad: parseInt(row['Cantidad'] || row['cantidad'] || 0),
-        precio_venta: parseFloat(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0),
-      })).filter((p: any) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
+        cantidad: parseInt(String(row['Cantidad'] || row['cantidad'] || 0)),
+        precio_venta: parseFloat(String(row['Precio de Venta'] || row['Precio'] || row['precio_venta'] || row['precio'] || 0)),
+      })).filter((p) => p.marca && p.amperaje && p.cantidad > 0 && p.precio_venta > 0);
 
       const response = await fetch('/api/tienda-inventario/saldos', {
         method: 'POST',
@@ -2486,15 +2462,13 @@ export default function TiendasPage() {
     }
   };
 
-  // Descargar formato de saldos
-  const handleDownloadSaldosFormat = async () => {
-    const XLSX = await import('xlsx');
-    const headers = [['Marca', 'Amperaje', 'Cantidad', 'Precio de Venta']];
-    const ws = XLSX.utils.aoa_to_sheet(headers);
-    ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 15 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Saldos');
-    XLSX.writeFile(wb, 'formato_saldos_anteriores.xlsx');
+  // Descargar formato de saldos - OPTIMIZADO
+  const handleDownloadSaldosFormat = () => {
+    createExcelTemplate(
+      ['Marca', 'Amperaje', 'Cantidad', 'Precio de Venta'],
+      'formato_saldos_anteriores',
+      'Saldos'
+    );
   };
 
   // Helper para estado del envío

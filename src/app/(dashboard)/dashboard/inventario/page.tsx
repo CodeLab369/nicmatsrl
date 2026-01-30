@@ -9,6 +9,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
 import { formatCurrency } from '@/lib/utils';
+import { readExcelFast, exportToExcelFast, createExcelTemplate } from '@/lib/excel-utils';
 import {
   Button, Card, CardContent, CardHeader, CardTitle,
   Input, Badge, Dialog, DialogContent, DialogDescription,
@@ -17,8 +18,6 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 interface InventoryItem {
   id: string;
@@ -361,7 +360,7 @@ export default function InventarioPage() {
     }
   };
 
-  // Exportar a Excel (ordenado por marca A-Z)
+  // Exportar a Excel (ordenado por marca A-Z) - OPTIMIZADO
   const handleExport = () => {
     // Ordenar por marca alfabéticamente antes de exportar
     const sortedItems = [...items].sort((a, b) => {
@@ -370,78 +369,65 @@ export default function InventarioPage() {
     });
     
     const exportData = sortedItems.map(item => ({
-      'Marca': item.marca,
-      'Amperaje': item.amperaje,
-      'Cantidad': item.cantidad,
-      'Costo': item.costo,
+      Marca: item.marca,
+      Amperaje: item.amperaje,
+      Cantidad: item.cantidad,
+      Costo: item.costo,
       'Precio de Venta': item.precio_venta,
       'Costo Total': item.cantidad * item.costo,
       'Costo Venta': item.cantidad * item.precio_venta,
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+    exportToExcelFast(exportData, `inventario_${new Date().toISOString().split('T')[0]}`, 'Inventario');
     toast({ title: 'Éxito', description: 'Inventario exportado correctamente', variant: 'success' });
   };
 
-  // Descargar formato
+  // Descargar formato - OPTIMIZADO
   const handleDownloadFormat = () => {
-    const headers = ['Marca', 'Amperaje', 'Cantidad', 'Costo', 'Precio de Venta'];
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Formato');
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, 'formato_inventario.xlsx');
+    createExcelTemplate(
+      ['Marca', 'Amperaje', 'Cantidad', 'Costo', 'Precio de Venta'],
+      'formato_inventario',
+      'Formato'
+    );
     toast({ title: 'Éxito', description: 'Formato descargado', variant: 'success' });
   };
 
-  // Importar desde Excel
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Importar desde Excel - OPTIMIZADO
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        setIsAnalyzing(true);
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+    try {
+      setIsAnalyzing(true);
+      
+      // Usar lectura optimizada (arrayBuffer en lugar de binary)
+      const data = await readExcelFast(file);
 
-        if (data.length === 0) {
-          toast({ title: 'Error', description: 'El archivo está vacío', variant: 'destructive' });
-          setIsAnalyzing(false);
-          return;
-        }
-
-        // Analizar datos antes de importar
-        const response = await fetch('/api/inventory?mode=analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-
-        if (!response.ok) throw new Error();
-        const result = await response.json();
-        
-        setImportData(data);
-        setImportAnalysis(result.analysis);
-        setImportDialogOpen(true);
-      } catch {
-        toast({ title: 'Error', description: 'Error al analizar el archivo', variant: 'destructive' });
-      } finally {
+      if (data.length === 0) {
+        toast({ title: 'Error', description: 'El archivo está vacío', variant: 'destructive' });
         setIsAnalyzing(false);
+        return;
       }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
+
+      // Analizar datos antes de importar
+      const response = await fetch('/api/inventory?mode=analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) throw new Error();
+      const result = await response.json();
+      
+      setImportData(data);
+      setImportAnalysis(result.analysis);
+      setImportDialogOpen(true);
+    } catch {
+      toast({ title: 'Error', description: 'Error al analizar el archivo', variant: 'destructive' });
+    } finally {
+      setIsAnalyzing(false);
+      e.target.value = '';
+    }
   };
 
   // Ejecutar importación
