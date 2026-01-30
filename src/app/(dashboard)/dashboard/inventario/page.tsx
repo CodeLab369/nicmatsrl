@@ -906,6 +906,7 @@ export default function InventarioPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Detalle del Producto</DialogTitle>
+            <DialogDescription>Información completa del producto seleccionado</DialogDescription>
           </DialogHeader>
           {selectedItem && (
             <div className="space-y-4">
