@@ -1135,14 +1135,31 @@ export default function InventarioPage() {
               {importAnalysis.new > 0 && importAnalysis.newItems?.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium text-green-500">Productos nuevos (preview):</h4>
-                  <div className="max-h-32 overflow-y-auto text-sm">
-                    {importAnalysis.newItems.map((item: any, i: number) => (
-                      <div key={i} className="py-1 border-b last:border-0">
-                        <strong>{item.marca}</strong> - {item.amperaje} ({item.cantidad} uds)
-                      </div>
-                    ))}
+                  <div className="max-h-40 overflow-y-auto text-sm">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="text-left p-1">Marca</th>
+                          <th className="text-left p-1">Amperaje</th>
+                          <th className="text-right p-1">Cant.</th>
+                          <th className="text-right p-1">Costo</th>
+                          <th className="text-right p-1">P. Venta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importAnalysis.newItems.map((item: any, i: number) => (
+                          <tr key={i} className="border-b last:border-0">
+                            <td className="p-1 font-medium">{item.marca}</td>
+                            <td className="p-1">{item.amperaje}</td>
+                            <td className="p-1 text-right">{item.cantidad}</td>
+                            <td className="p-1 text-right">{item.costo > 0 ? `Bs. ${item.costo}` : '-'}</td>
+                            <td className="p-1 text-right">{item.precio_venta > 0 ? `Bs. ${item.precio_venta}` : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                     {importAnalysis.new > 10 && (
-                      <p className="text-muted-foreground">...y {importAnalysis.new - 10} más</p>
+                      <p className="text-muted-foreground text-center py-1">...y {importAnalysis.new - 10} más</p>
                     )}
                   </div>
                 </div>
@@ -1152,14 +1169,65 @@ export default function InventarioPage() {
               {importAnalysis.existing > 0 && importAnalysis.updateItems?.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium text-blue-600">Se actualizarán (preview):</h4>
-                  <div className="max-h-32 overflow-y-auto text-sm">
-                    {importAnalysis.updateItems.map((item: any, i: number) => (
-                      <div key={i} className="py-1 border-b last:border-0">
-                        <strong>{item.marca}</strong> - {item.amperaje}: {item.existingCantidad} → {importUpdateMode === 'sum' ? item.existingCantidad + item.cantidad : item.cantidad}
-                      </div>
-                    ))}
+                  <div className="max-h-40 overflow-y-auto text-sm">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="text-left p-1">Marca</th>
+                          <th className="text-left p-1">Amperaje</th>
+                          <th className="text-right p-1">Cantidad</th>
+                          {importUpdatePrices && (
+                            <>
+                              <th className="text-right p-1">Costo</th>
+                              <th className="text-right p-1">P. Venta</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importAnalysis.updateItems.map((item: any, i: number) => (
+                          <tr key={i} className="border-b last:border-0">
+                            <td className="p-1 font-medium">{item.marca}</td>
+                            <td className="p-1">{item.amperaje}</td>
+                            <td className="p-1 text-right">
+                              <span className="text-muted-foreground">{item.existingCantidad}</span>
+                              <span className="mx-1">→</span>
+                              <span className="text-green-600 font-medium">
+                                {importUpdateMode === 'sum' ? item.existingCantidad + item.cantidad : item.cantidad}
+                              </span>
+                            </td>
+                            {importUpdatePrices && (
+                              <>
+                                <td className="p-1 text-right">
+                                  {item.costo > 0 ? (
+                                    <>
+                                      <span className="text-muted-foreground">{item.existingCosto}</span>
+                                      <span className="mx-1">→</span>
+                                      <span className="text-orange-500 font-medium">{item.costo}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="p-1 text-right">
+                                  {item.precio_venta > 0 ? (
+                                    <>
+                                      <span className="text-muted-foreground">{item.existingPrecioVenta}</span>
+                                      <span className="mx-1">→</span>
+                                      <span className="text-orange-500 font-medium">{item.precio_venta}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                     {importAnalysis.existing > 10 && (
-                      <p className="text-muted-foreground">...y {importAnalysis.existing - 10} más</p>
+                      <p className="text-muted-foreground text-center py-1">...y {importAnalysis.existing - 10} más</p>
                     )}
                   </div>
                 </div>
