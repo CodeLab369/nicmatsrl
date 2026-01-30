@@ -90,15 +90,14 @@ export async function GET(request: NextRequest) {
       return query;
     };
 
-    // Si es consulta sin paginación (para transferencias masivas)
+    // Si es consulta sin paginación (para exportación o transferencias masivas)
     if (noPagination) {
       let allQuery = supabase
         .from('inventory')
         .select('id, marca, amperaje, cantidad, costo, precio_venta');
       
-      if (minStock) {
-        allQuery = allQuery.gte('cantidad', parseInt(minStock));
-      }
+      // Aplicar TODOS los filtros también en modo sin paginación
+      allQuery = applyFilters(allQuery, true);
       
       const { data: allItems, error: allError } = await allQuery.order('marca');
       

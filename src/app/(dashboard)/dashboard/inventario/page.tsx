@@ -361,25 +361,57 @@ export default function InventarioPage() {
   };
 
   // Exportar a Excel (ordenado por marca A-Z) - OPTIMIZADO
-  const handleExport = () => {
-    // Ordenar por marca alfabéticamente antes de exportar
-    const sortedItems = [...items].sort((a, b) => {
-      const marcaCompare = a.marca.localeCompare(b.marca);
-      return marcaCompare !== 0 ? marcaCompare : a.amperaje.localeCompare(b.amperaje);
-    });
-    
-    const exportData = sortedItems.map(item => ({
-      Marca: item.marca,
-      Amperaje: item.amperaje,
-      Cantidad: item.cantidad,
-      Costo: item.costo,
-      'Precio de Venta': item.precio_venta,
-      'Costo Total': item.cantidad * item.costo,
-      'Costo Venta': item.cantidad * item.precio_venta,
-    }));
+  // Exporta TODOS los productos, no solo la página actual
+  const handleExport = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Obtener TODOS los productos sin paginación
+      const params = new URLSearchParams({
+        noPagination: 'true',
+        _t: Date.now().toString(),
+      });
+      // Mantener filtros actuales si los hay
+      if (search) params.set('search', search);
+      if (filterMarca && filterMarca !== '_all') params.set('marca', filterMarca);
+      if (filterAmperaje && filterAmperaje !== '_all') params.set('amperaje', filterAmperaje);
+      if (cantidadOp && cantidadOp !== '_none' && cantidadVal) {
+        params.set('cantidadOp', cantidadOp);
+        params.set('cantidadVal', cantidadVal);
+      }
 
-    exportToExcelFast(exportData, `inventario_${new Date().toISOString().split('T')[0]}`, 'Inventario');
-    toast({ title: 'Éxito', description: 'Inventario exportado correctamente', variant: 'success' });
+      const response = await fetch(`/api/inventory?${params}`);
+      const data = await response.json();
+
+      if (!data.items || data.items.length === 0) {
+        toast({ title: 'Error', description: 'No hay productos para exportar', variant: 'destructive' });
+        return;
+      }
+
+      // Ordenar por marca alfabéticamente antes de exportar
+      const sortedItems = [...data.items].sort((a: InventoryItem, b: InventoryItem) => {
+        const marcaCompare = a.marca.localeCompare(b.marca);
+        return marcaCompare !== 0 ? marcaCompare : a.amperaje.localeCompare(b.amperaje);
+      });
+      
+      const exportData = sortedItems.map((item: InventoryItem) => ({
+        Marca: item.marca,
+        Amperaje: item.amperaje,
+        Cantidad: item.cantidad,
+        Costo: item.costo,
+        'Precio de Venta': item.precio_venta,
+        'Costo Total': item.cantidad * item.costo,
+        'Costo Venta': item.cantidad * item.precio_venta,
+      }));
+
+      exportToExcelFast(exportData, `inventario_${new Date().toISOString().split('T')[0]}`, 'Inventario');
+      toast({ title: 'Éxito', description: `${sortedItems.length} productos exportados correctamente`, variant: 'success' });
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      toast({ title: 'Error', description: 'No se pudo exportar el inventario', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Descargar formato - OPTIMIZADO
