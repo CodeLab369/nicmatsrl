@@ -282,7 +282,7 @@ export default function InventarioPage() {
       setFormData({ marca: '', amperaje: '', cantidad: '', costo: '', precioVenta: '' });
       setExistingProduct(null);
       setAddMode('new');
-      fetchInventory();
+      // No llamamos fetchInventory() - Realtime lo actualizará automáticamente
       fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo procesar la operación', variant: 'destructive' });
@@ -306,7 +306,7 @@ export default function InventarioPage() {
       
       toast({ title: 'Éxito', description: 'Producto actualizado correctamente', variant: 'success' });
       setEditDialogOpen(false);
-      fetchInventory();
+      // No llamamos fetchInventory() - Realtime lo actualizará automáticamente
       fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo actualizar el producto', variant: 'destructive' });
@@ -325,7 +325,7 @@ export default function InventarioPage() {
       
       toast({ title: 'Éxito', description: 'Producto eliminado correctamente', variant: 'success' });
       setDeleteDialogOpen(false);
-      fetchInventory();
+      // No llamamos fetchInventory() - Realtime lo actualizará automáticamente
       fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo eliminar el producto', variant: 'destructive' });
@@ -352,7 +352,7 @@ export default function InventarioPage() {
       toast({ title: 'Éxito', description: 'Inventario vaciado correctamente', variant: 'success' });
       setClearDialogOpen(false);
       clearFilters();
-      fetchInventory();
+      // No llamamos fetchInventory() - Realtime lo actualizará automáticamente
       fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'No se pudo vaciar el inventario', variant: 'destructive' });
@@ -471,7 +471,7 @@ export default function InventarioPage() {
       setImportDialogOpen(false);
       setImportAnalysis(null);
       setImportData([]);
-      fetchInventory();
+      // No llamamos fetchInventory() - Realtime lo actualizará automáticamente
       fetchMarcas();
     } catch {
       toast({ title: 'Error', description: 'Error al importar productos', variant: 'destructive' });
