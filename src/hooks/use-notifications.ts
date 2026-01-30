@@ -79,6 +79,10 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, [isSupported]);
 
+  // Detectar si es dispositivo móvil/tablet
+  const isMobile = typeof window !== 'undefined' && 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
   // Enviar notificación
   const sendNotification = useCallback((
     notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>
@@ -93,8 +97,19 @@ export function useNotifications(): UseNotificationsReturn {
     // Agregar a la lista
     setNotifications(prev => [newNotification, ...prev]);
 
-    // Mostrar notificación del navegador si hay permiso
-    if (isSupported && permission === 'granted') {
+    // En móviles/tablets, intentar vibrar para alertar
+    if (isMobile && 'vibrate' in navigator) {
+      try {
+        // Patrón de vibración: alta prioridad = más largo
+        const isHighPriority = ['stockAgotado', 'stockBajo', 'cotizacionPorVencer'].includes(notification.type);
+        navigator.vibrate(isHighPriority ? [200, 100, 200] : [100]);
+      } catch (e) {
+        // Ignorar si no se puede vibrar
+      }
+    }
+
+    // Mostrar notificación del navegador si hay permiso (funciona mejor en desktop)
+    if (isSupported && permission === 'granted' && !isMobile) {
       try {
         const browserNotif = new Notification(notification.title, {
           body: notification.message,
@@ -115,7 +130,7 @@ export function useNotifications(): UseNotificationsReturn {
         console.error('Error showing browser notification:', error);
       }
     }
-  }, [isSupported, permission]);
+  }, [isSupported, permission, isMobile]);
 
   // Marcar como leída
   const markAsRead = useCallback((id: string) => {

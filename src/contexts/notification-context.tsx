@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useNotifications, AppNotification } from '@/hooks/use-notifications';
 import { useAuth, useTableSubscription } from '@/contexts';
+import { useToast } from '@/hooks/use-toast';
 import { NotificationPermissions, DEFAULT_NOTIFICATION_PERMISSIONS } from '@/types';
 
 interface NotificationContextType {
@@ -40,6 +41,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   } = useNotifications();
 
   const { user } = useAuth();
+  const { toast } = useToast();
   const previousData = useRef<PreviousData>({
     inventory: {},
     cotizaciones: {},
@@ -47,6 +49,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     envios: new Set(),
   });
   const isInitialized = useRef(false);
+
+  // Detectar si es móvil
+  const isMobile = typeof window !== 'undefined' && 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Wrapper para enviar notificación + mostrar toast en móviles
+  const sendNotificationWithToast = useCallback((
+    notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>
+  ) => {
+    sendNotification(notification);
+    
+    // En móviles, mostrar también un toast visible
+    if (isMobile) {
+      const isHighPriority = ['stockAgotado', 'stockBajo', 'cotizacionPorVencer'].includes(notification.type);
+      toast({
+        title: notification.title,
+        description: notification.message,
+        variant: isHighPriority ? 'destructive' : 'default',
+        duration: isHighPriority ? 8000 : 5000,
+      });
+    }
+  }, [sendNotification, toast, isMobile]);
 
   // Obtener permisos de notificación del usuario actual
   const getNotifPermissions = useCallback((): NotificationPermissions => {
@@ -72,14 +96,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           // Solo notificar si el stock bajó (no en la carga inicial)
           if (prevCant !== undefined && prevCant > producto.cantidad) {
             if (producto.cantidad === 0 && perms.stockAgotado) {
-              sendNotification({
+              sendNotificationWithToast({
                 type: 'stockAgotado',
                 title: '🚨 Stock Agotado',
                 message: `${producto.marca} ${producto.amperaje} se ha agotado`,
                 data: { productId: producto.id }
               });
             } else if (producto.cantidad > 0 && producto.cantidad < 5 && perms.stockBajo) {
-              sendNotification({
+              sendNotificationWithToast({
                 type: 'stockBajo',
                 title: '⚠️ Stock Bajo',
                 message: `${producto.marca} ${producto.amperaje}: ${producto.cantidad} unidades`,
@@ -94,7 +118,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error checking stock alerts:', error);
     }
-  }, [getNotifPermissions, sendNotification]);
+  }, [getNotifPermissions, sendNotificationWithToast]);
 
   // Verificar cotizaciones (nuevas, cambio de estado, por vencer)
   const checkCotizacionAlerts = useCallback(async () => {
@@ -114,7 +138,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           
           // Nueva cotización
           if (!prev && perms.nuevaCotizacion) {
-            sendNotification({
+            sendNotificationWithToast({
               type: 'nuevaCotizacion',
               title: '📄 Nueva Cotización',
               message: `${cot.numero} - ${cot.cliente_nombre}`,
@@ -131,7 +155,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               pendiente: '⏳ Pendiente'
             }[cot.estado] || cot.estado;
             
-            sendNotification({
+            sendNotificationWithToast({
               type: 'cotizacionEstado',
               title: 'Cotización Actualizada',
               message: `${cot.numero}: ${estadoTexto}`,
@@ -149,7 +173,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               // Solo notificar una vez por cotización
               const notifKey = `vencer_${cot.id}_${diasRestantes}`;
               if (!localStorage.getItem(notifKey)) {
-                sendNotification({
+                sendNotificationWithToast({
                   type: 'cotizacionPorVencer',
                   title: '⏰ Cotización por Vencer',
                   message: `${cot.numero} vence en ${diasRestantes} día${diasRestantes > 1 ? 's' : ''}`,
@@ -169,7 +193,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error checking cotizacion alerts:', error);
     }
-  }, [getNotifPermissions, sendNotification]);
+  }, [getNotifPermissions, sendNotificationWithToast]);
 
   // Verificar envíos a tienda
   const checkEnvioAlerts = useCallback(async () => {
@@ -186,7 +210,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (data.envios) {
         data.envios.forEach((envio: { id: string; tienda_nombre?: string; total_unidades: number }) => {
           if (!previousData.current.envios.has(envio.id)) {
-            sendNotification({
+            sendNotificationWithToast({
               type: 'envioTienda',
               title: '📦 Nuevo Envío a Tienda',
               message: `${envio.tienda_nombre || 'Tienda'}: ${envio.total_unidades} unidades`,
@@ -199,7 +223,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error checking envio alerts:', error);
     }
-  }, [getNotifPermissions, sendNotification]);
+  }, [getNotifPermissions, sendNotificationWithToast]);
 
   // Verificar usuarios conectados
   const checkUserAlerts = useCallback(async () => {
@@ -217,14 +241,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         data.users.forEach((u: { id: string; fullName: string; isOnline: boolean }) => {
           const wasOnline = previousData.current.users[u.id];
           
-          // Si estaba offline y ahora está online
-          if (wasOnline === false && u.isOnline && u.id !== user?.id) {
-            sendNotification({
-              type: 'usuarioConectado',
-              title: '👤 Usuario Conectado',
-              message: `${u.fullName} ha iniciado sesión`,
-              data: { userId: u.id }
-            });
+          // Si estaba offline (false) o no registrado (undefined con datos previos cargados) y ahora está online
+          // Excluir al usuario actual
+          if (wasOnline !== true && u.isOnline && u.id !== user?.id) {
+            // Verificar que no sea la primera carga de este usuario específico
+            if (wasOnline !== undefined) {
+              sendNotificationWithToast({
+                type: 'usuarioConectado',
+                title: '👤 Usuario Conectado',
+                message: `${u.fullName} ha iniciado sesión`,
+                data: { userId: u.id }
+              });
+            }
           }
           
           previousData.current.users[u.id] = u.isOnline;
@@ -233,7 +261,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error checking user alerts:', error);
     }
-  }, [getNotifPermissions, sendNotification, user?.id]);
+  }, [getNotifPermissions, sendNotificationWithToast, user?.id]);
 
   // Inicializar datos sin notificar
   const initializeData = useCallback(async () => {
