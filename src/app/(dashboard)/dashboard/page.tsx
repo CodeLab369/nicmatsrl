@@ -19,13 +19,27 @@ import {
   TrendingUp,
   Battery,
   Clock,
-  ArrowRight,
   ShoppingCart,
   CheckCircle,
   BarChart3,
   Store,
   UserCog,
+  AlertTriangle,
+  ArrowUpRight,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 
 interface DashboardStats {
   productos: number;
@@ -37,6 +51,26 @@ interface DashboardStats {
   cotizacionesPendientes: number;
   cotizacionesAceptadas: number;
   usuarios: number;
+}
+
+interface StockBajoAlert {
+  total: number;
+  agotados: number;
+  bajos: number;
+  productos: Array<{ id: string; marca: string; amperaje: string; cantidad: number }>;
+  umbral: number;
+}
+
+interface MarcaData {
+  marca: string;
+  cantidad: number;
+  valor: number;
+}
+
+interface CotizacionesPorEstado {
+  name: string;
+  value: number;
+  color: string;
 }
 
 export default function DashboardPage() {
@@ -53,20 +87,26 @@ export default function DashboardPage() {
     usuarios: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [stockBajo, setStockBajo] = useState<StockBajoAlert | null>(null);
+  const [marcasData, setMarcasData] = useState<MarcaData[]>([]);
+  const [cotizacionesEstado, setCotizacionesEstado] = useState<CotizacionesPorEstado[]>([]);
 
   const fetchStats = useCallback(async () => {
     try {
-      // Fetch inventario stats
-      const invRes = await fetch('/api/inventory?limit=1');
-      const invData = await invRes.json();
-      
-      // Fetch cotizaciones stats
-      const cotRes = await fetch('/api/cotizaciones?getStats=true');
-      const cotData = await cotRes.json();
-      
-      // Fetch usuarios count
-      const usersRes = await fetch('/api/users');
-      const usersData = await usersRes.json();
+      // Fetch en paralelo para mayor velocidad
+      const [invRes, cotRes, usersRes, alertsRes] = await Promise.all([
+        fetch('/api/inventory?limit=1&_t=' + Date.now()),
+        fetch('/api/cotizaciones?getStats=true&_t=' + Date.now()),
+        fetch('/api/users?_t=' + Date.now()),
+        fetch('/api/alerts?_t=' + Date.now()),
+      ]);
+
+      const [invData, cotData, usersData, alertsData] = await Promise.all([
+        invRes.json(),
+        cotRes.json(),
+        usersRes.json(),
+        alertsRes.json(),
+      ]);
       
       setStats({
         productos: invData.totalProducts || 0,
@@ -79,6 +119,17 @@ export default function DashboardPage() {
         cotizacionesAceptadas: cotData.stats?.aceptadas || 0,
         usuarios: usersData.users?.length || 0,
       });
+
+      setStockBajo(alertsData.stockBajo || null);
+
+      // Datos para gráfico de cotizaciones por estado
+      setCotizacionesEstado([
+        { name: 'Pendientes', value: cotData.stats?.pendientes || 0, color: '#f59e0b' },
+        { name: 'Aceptadas', value: cotData.stats?.aceptadas || 0, color: '#22c55e' },
+        { name: 'Convertidas', value: cotData.stats?.convertidas || 0, color: '#3b82f6' },
+        { name: 'Rechazadas', value: cotData.stats?.rechazadas || 0, color: '#ef4444' },
+      ].filter(item => item.value > 0));
+
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -86,12 +137,44 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Fetch datos de marcas para el gráfico de barras
+  const fetchMarcasData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/inventory?noPagination=true&_t=' + Date.now());
+      const data = await res.json();
+      
+      if (data.items) {
+        // Agrupar por marca
+        const marcasMap = new Map<string, { cantidad: number; valor: number }>();
+        
+        data.items.forEach((item: { marca: string; cantidad: number; precio_venta: number }) => {
+          const existing = marcasMap.get(item.marca) || { cantidad: 0, valor: 0 };
+          marcasMap.set(item.marca, {
+            cantidad: existing.cantidad + item.cantidad,
+            valor: existing.valor + (item.cantidad * item.precio_venta),
+          });
+        });
+
+        // Convertir a array y ordenar por cantidad
+        const marcasArray: MarcaData[] = Array.from(marcasMap.entries())
+          .map(([marca, data]) => ({ marca, ...data }))
+          .sort((a, b) => b.cantidad - a.cantidad)
+          .slice(0, 8); // Top 8 marcas
+
+        setMarcasData(marcasArray);
+      }
+    } catch (error) {
+      console.error('Error fetching marcas data:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchMarcasData();
+  }, [fetchStats, fetchMarcasData]);
 
   // Realtime: actualizar cuando cambien las tablas principales
-  useTableSubscription('inventory', fetchStats);
+  useTableSubscription('inventory', () => { fetchStats(); fetchMarcasData(); });
   useTableSubscription('cotizaciones', fetchStats);
   useTableSubscription('users', fetchStats);
   useTableSubscription('tienda_ventas', fetchStats);
@@ -183,6 +266,125 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Alerta de Stock Bajo */}
+      {stockBajo && stockBajo.total > 0 && user?.permissions?.inventario && (
+        <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="p-3 rounded-full bg-amber-500/20">
+              <AlertTriangle className="h-6 w-6 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-800 dark:text-amber-400">
+                ¡Alerta de Stock!
+              </h3>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {stockBajo.agotados > 0 && <span className="font-medium">{stockBajo.agotados} productos agotados</span>}
+                {stockBajo.agotados > 0 && stockBajo.bajos > 0 && ' y '}
+                {stockBajo.bajos > 0 && <span>{stockBajo.bajos} con stock bajo (&lt;{stockBajo.umbral})</span>}
+              </p>
+            </div>
+            <Link href="/dashboard/inventario">
+              <span className="text-sm font-medium text-amber-600 hover:text-amber-700 flex items-center gap-1">
+                Ver inventario <ArrowUpRight className="h-4 w-4" />
+              </span>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de Inventario por Marca */}
+        {user?.permissions?.inventario && marcasData.length > 0 && (
+          <Card className="shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Inventario por Marca
+              </CardTitle>
+              <CardDescription>
+                Distribución de unidades por marca (Top 8)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={marcasData} layout="vertical" margin={{ left: 0, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis 
+                      dataKey="marca" 
+                      type="category" 
+                      tick={{ fontSize: 11 }} 
+                      width={80}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="cantidad" 
+                      fill="hsl(var(--primary))" 
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Gráfico de Cotizaciones por Estado */}
+        {user?.permissions?.cotizaciones && cotizacionesEstado.length > 0 && (
+          <Card className="shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Cotizaciones por Estado
+              </CardTitle>
+              <CardDescription>
+                Distribución actual de cotizaciones
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={cotizacionesEstado}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+                    >
+                      {cotizacionesEstado.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Información adicional */}

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Battery,
   LayoutDashboard,
@@ -14,11 +15,12 @@ import {
   TrendingUp,
   BarChart3,
   WifiOff,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth, useRealtimeContext } from '@/contexts';
+import { useAuth, useRealtimeContext, useTableSubscription } from '@/contexts';
 import { COMPANY, ROUTES, USER_ROLES } from '@/lib/constants';
-import { Separator } from '@/components/ui';
+import { Separator, Badge } from '@/components/ui';
 
 interface SidebarProps {
   className?: string;
@@ -106,6 +108,25 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { isConnected } = useRealtimeContext();
+  const [stockBajoCount, setStockBajoCount] = useState(0);
+
+  // Fetch alertas de stock bajo
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      const data = await res.json();
+      setStockBajoCount(data.stockBajo?.total || 0);
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
+
+  // Actualizar alertas cuando cambie el inventario
+  useTableSubscription('inventory', fetchAlerts);
 
   const isActiveLink = (href: string) => {
     if (href === ROUTES.DASHBOARD) {
@@ -158,6 +179,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               {group.items.filter(hasAccess).map((item) => {
                 const Icon = item.icon;
                 const isActive = isActiveLink(item.href);
+                const showStockAlert = item.href === ROUTES.INVENTORY && stockBajoCount > 0;
 
                 return (
                   <li key={item.href}>
@@ -172,7 +194,12 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                       )}
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {showStockAlert && (
+                        <Badge variant="destructive" className="h-5 min-w-5 flex items-center justify-center text-[10px] px-1.5">
+                          {stockBajoCount}
+                        </Badge>
+                      )}
                     </Link>
                   </li>
                 );

@@ -5,7 +5,8 @@ import {
   Plus, Search, Clock, CheckCircle, ShoppingCart, FileText,
   ChevronLeft, ChevronRight, Eye, Printer, Check, X, Trash2,
   Package, User, Phone, Mail, MapPin, Calendar, AlertCircle,
-  Minus, RefreshCw, Settings, Upload, Building2, Hash, Save, Pencil
+  Minus, RefreshCw, Settings, Upload, Building2, Hash, Save, Pencil,
+  MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -582,6 +583,47 @@ export default function CotizacionesPage() {
     } catch {
       toast({ title: 'Error', description: 'No se pudo eliminar', variant: 'destructive' });
     }
+  };
+
+  // Enviar por WhatsApp
+  const handleWhatsApp = (cotizacion: Cotizacion) => {
+    const cfg = empresaConfig;
+    const fechaFormat = new Date(cotizacion.fecha).toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    // Construir mensaje
+    let mensaje = `🔋 *COTIZACIÓN ${cotizacion.numero}*\n`;
+    mensaje += `📅 Fecha: ${fechaFormat}\n`;
+    mensaje += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    mensaje += `👤 *Cliente:* ${cotizacion.cliente_nombre}\n\n`;
+    mensaje += `📦 *PRODUCTOS:*\n`;
+    
+    cotizacion.productos.forEach((p, i) => {
+      mensaje += `${i + 1}. ${p.marca} ${p.amperaje}\n`;
+      mensaje += `   Cant: ${p.cantidad} | Bs. ${p.precio.toLocaleString('es-BO', { minimumFractionDigits: 2 })} c/u\n`;
+      mensaje += `   *Subtotal: Bs. ${p.total.toLocaleString('es-BO', { minimumFractionDigits: 2 })}*\n\n`;
+    });
+    
+    mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
+    if (cotizacion.descuento > 0) {
+      mensaje += `Subtotal: Bs. ${cotizacion.subtotal.toLocaleString('es-BO', { minimumFractionDigits: 2 })}\n`;
+      mensaje += `Descuento: -Bs. ${cotizacion.descuento.toLocaleString('es-BO', { minimumFractionDigits: 2 })}\n`;
+    }
+    mensaje += `💰 *TOTAL: Bs. ${cotizacion.total.toLocaleString('es-BO', { minimumFractionDigits: 2 })}*\n\n`;
+    mensaje += `⏰ Válido por ${cotizacion.vigencia_dias} días\n\n`;
+    mensaje += `━━━━━━━━━━━━━━━━━━━━\n`;
+    mensaje += `🏢 *${cfg.nombre}*\n`;
+    mensaje += `📞 ${cfg.telefono_principal}\n`;
+    if (cfg.direccion) mensaje += `📍 ${cfg.direccion}`;
+    
+    // Limpiar teléfono del cliente (solo números)
+    const telefonoLimpio = cotizacion.cliente_telefono?.replace(/\D/g, '') || '';
+    
+    // Crear URL de WhatsApp
+    const whatsappUrl = telefonoLimpio 
+      ? `https://wa.me/591${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+    
+    window.open(whatsappUrl, '_blank');
   };
 
   // Imprimir/PDF
@@ -1495,6 +1537,15 @@ export default function CotizacionesPage() {
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-green-600 hover:text-green-700"
+                              onClick={() => handleWhatsApp(cot)}
+                              title="Enviar por WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
                             {cot.estado === 'pendiente' && (
                               <>
                                 <Button 
@@ -1666,8 +1717,15 @@ export default function CotizacionesPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Cerrar</Button>
+            <Button 
+              variant="outline" 
+              className="text-green-600 border-green-600 hover:bg-green-50"
+              onClick={() => selectedCotizacion && handleWhatsApp(selectedCotizacion)}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+            </Button>
             <Button onClick={() => selectedCotizacion && handlePrint(selectedCotizacion)}>
               <Printer className="mr-2 h-4 w-4" /> Imprimir
             </Button>
