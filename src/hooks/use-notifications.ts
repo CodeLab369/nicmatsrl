@@ -98,8 +98,7 @@ export function useNotifications(): UseNotificationsReturn {
       try {
         const browserNotif = new Notification(notification.title, {
           body: notification.message,
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
+          icon: '/favicon.svg',
           tag: notification.type,
           requireInteraction: notification.type === 'stockAgotado' || notification.type === 'stockBajo',
         });
