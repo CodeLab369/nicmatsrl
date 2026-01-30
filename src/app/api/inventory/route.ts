@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Crear producto o importación inteligente
+// POST - Crear producto o importación inteligente OPTIMIZADA
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -172,27 +172,35 @@ export async function POST(request: NextRequest) {
       const updateMode = searchParams.get('updateMode') || 'sum'; // 'sum' o 'replace'
       const updatePrices = searchParams.get('updatePrices') === 'true';
 
-      // Normalizar datos del Excel
-      const items = body.map(item => ({
-        marca: (item.marca || item.Marca || '').toString().trim(),
-        amperaje: (item.amperaje || item.Amperaje || '').toString().trim(),
-        cantidad: parseInt(item.cantidad || item.Cantidad) || 0,
-        costo: parseFloat(item.costo || item.Costo) || 0,
-        precio_venta: parseFloat(item.precio_venta || item['Precio de Venta'] || item.PrecioVenta || item.precioVenta) || 0,
-      })).filter(item => item.marca && item.amperaje);
+      // Normalizar datos del Excel de forma optimizada
+      const items = [];
+      for (const item of body) {
+        const marca = (item.marca || item.Marca || '').toString().trim();
+        const amperaje = (item.amperaje || item.Amperaje || '').toString().trim();
+        if (marca && amperaje) {
+          items.push({
+            marca,
+            amperaje,
+            cantidad: parseInt(item.cantidad || item.Cantidad) || 0,
+            costo: parseFloat(item.costo || item.Costo) || 0,
+            precio_venta: parseFloat(item.precio_venta || item['Precio de Venta'] || item.PrecioVenta || item.precioVenta) || 0,
+          });
+        }
+      }
 
       if (items.length === 0) {
         return NextResponse.json({ error: 'No se encontraron productos válidos en el archivo' }, { status: 400 });
       }
 
-      // Obtener todos los productos existentes
+      // Obtener solo los campos necesarios para máxima velocidad
       const { data: existing } = await supabase
         .from('inventory')
         .select('id, marca, amperaje, cantidad, costo, precio_venta');
 
       // Crear mapa de productos existentes (Marca + Amperaje como key)
-      const existingMap = new Map();
-      (existing || []).forEach(item => {
+      type ExistingItem = { id: string; marca: string; amperaje: string; cantidad: number; costo: number; precio_venta: number };
+      const existingMap = new Map<string, ExistingItem>();
+      (existing || []).forEach((item: ExistingItem) => {
         const key = `${item.marca.toLowerCase()}|${item.amperaje.toLowerCase()}`;
         existingMap.set(key, item);
       });
@@ -236,35 +244,55 @@ export async function POST(request: NextRequest) {
       let insertedCount = 0;
       let updatedCount = 0;
 
-      // Insertar nuevos productos
+      // Insertar nuevos productos en batch (mucho más rápido)
       if (newItems.length > 0) {
-        const { data, error } = await supabase
-          .from('inventory')
-          .insert(newItems)
-          .select();
-        if (error) throw error;
-        insertedCount = data?.length || 0;
+        // Dividir en chunks de 500 para evitar límites
+        const chunkSize = 500;
+        for (let i = 0; i < newItems.length; i += chunkSize) {
+          const chunk = newItems.slice(i, i + chunkSize);
+          const { data, error } = await supabase
+            .from('inventory')
+            .insert(chunk)
+            .select('id');
+          if (error) throw error;
+          insertedCount += data?.length || 0;
+        }
       }
 
-      // Actualizar productos existentes
-      for (const item of updateItems) {
-        const newCantidad = updateMode === 'sum' 
-          ? item.existingCantidad + item.cantidad 
-          : item.cantidad;
-
-        const updateData: any = { cantidad: newCantidad };
+      // Actualizar productos existentes en BATCH usando upsert
+      // Esto es MUCHO más rápido que actualizar uno por uno
+      if (updateItems.length > 0) {
+        // Preparar datos para actualización en batch
+        const updatePromises: Promise<any>[] = [];
+        const chunkSize = 100; // Procesar en chunks para no saturar
         
-        if (updatePrices) {
-          updateData.costo = item.costo;
-          updateData.precio_venta = item.precio_venta;
+        for (let i = 0; i < updateItems.length; i += chunkSize) {
+          const chunk = updateItems.slice(i, i + chunkSize);
+          
+          // Crear array de promesas para actualización paralela
+          const chunkPromises = chunk.map(item => {
+            const newCantidad = updateMode === 'sum' 
+              ? item.existingCantidad + item.cantidad 
+              : item.cantidad;
+
+            const updateData: Record<string, unknown> = { cantidad: newCantidad };
+            
+            if (updatePrices) {
+              if (item.costo > 0) updateData.costo = item.costo;
+              if (item.precio_venta > 0) updateData.precio_venta = item.precio_venta;
+            }
+
+            return supabase
+              .from('inventory')
+              .update(updateData)
+              .eq('id', item.existingId)
+              .then(({ error }) => error ? 0 : 1);
+          });
+          
+          // Ejecutar chunk en paralelo
+          const results = await Promise.all(chunkPromises);
+          updatedCount += results.reduce((a: number, b: number) => a + b, 0);
         }
-
-        const { error } = await supabase
-          .from('inventory')
-          .update(updateData)
-          .eq('id', item.existingId);
-
-        if (!error) updatedCount++;
       }
 
       return NextResponse.json({ 
