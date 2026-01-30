@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Obtener usuario actualizado de la base de datos
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, full_name, role, is_active, last_login, created_at, permissions, notification_permissions')
+      .select('id, username, full_name, role, is_active, last_login, created_at, permissions')
       .eq('id', payload.userId)
       .eq('is_active', true)
       .single();
@@ -43,25 +43,10 @@ export async function GET(request: NextRequest) {
       estadisticas: false,
     };
 
-    const DEFAULT_NOTIFICATION_PERMISSIONS = {
-      stockBajo: true,
-      stockAgotado: true,
-      cotizacionPorVencer: true,
-      nuevaCotizacion: true,
-      cotizacionEstado: true,
-      envioTienda: true,
-      usuarioConectado: false,
-    };
-
     // Merge de permisos
     const userPermissions = {
       ...DEFAULT_PERMISSIONS,
       ...(user.permissions || {}),
-    };
-
-    const userNotificationPermissions = {
-      ...DEFAULT_NOTIFICATION_PERMISSIONS,
-      ...(user.notification_permissions || {}),
     };
 
     return NextResponse.json({
@@ -74,7 +59,6 @@ export async function GET(request: NextRequest) {
         lastLogin: user.last_login,
         createdAt: user.created_at,
         permissions: userPermissions,
-        notificationPermissions: userNotificationPermissions,
       },
     });
   } catch (error) {

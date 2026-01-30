@@ -22,35 +22,6 @@ export interface UserPermissions {
 }
 
 /**
- * Permisos de notificaciones del sistema
- */
-export interface NotificationPermissions {
-  // Alta prioridad
-  stockBajo: boolean;
-  stockAgotado: boolean;
-  cotizacionPorVencer: boolean;
-  // Media prioridad
-  nuevaCotizacion: boolean;
-  cotizacionEstado: boolean;
-  envioTienda: boolean;
-  // Baja prioridad
-  usuarioConectado: boolean;
-}
-
-/**
- * Valores por defecto de permisos de notificaciones
- */
-export const DEFAULT_NOTIFICATION_PERMISSIONS: NotificationPermissions = {
-  stockBajo: true,
-  stockAgotado: true,
-  cotizacionPorVencer: true,
-  nuevaCotizacion: true,
-  cotizacionEstado: true,
-  envioTienda: true,
-  usuarioConectado: false,
-};
-
-/**
  * Usuario del sistema
  */
 export interface User extends BaseEntity {
@@ -60,7 +31,6 @@ export interface User extends BaseEntity {
   isActive: boolean;
   lastLogin?: string;
   permissions?: UserPermissions;
-  notificationPermissions?: NotificationPermissions;
   isOnline?: boolean;
   lastSeen?: string;
 }

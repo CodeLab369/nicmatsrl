@@ -20,16 +20,6 @@ const DEFAULT_PERMISSIONS = {
   estadisticas: true,
 };
 
-const DEFAULT_NOTIFICATION_PERMISSIONS = {
-  stockBajo: true,
-  stockAgotado: true,
-  cotizacionPorVencer: true,
-  nuevaCotizacion: true,
-  cotizacionEstado: true,
-  envioTienda: true,
-  usuarioConectado: false,
-};
-
 // GET - Listar usuarios con presencia
 export async function GET() {
   try {
@@ -37,7 +27,7 @@ export async function GET() {
     const [usersResult, presenceResult] = await Promise.all([
       supabase
         .from('users')
-        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at, permissions, notification_permissions')
+        .select('id, username, full_name, role, is_active, last_login, created_at, updated_at, permissions')
         .order('created_at', { ascending: false }),
       supabase
         .from('user_presence')
@@ -61,7 +51,6 @@ export async function GET() {
       createdAt: u.created_at,
       updatedAt: u.updated_at,
       permissions: u.permissions || DEFAULT_PERMISSIONS,
-      notificationPermissions: u.notification_permissions || DEFAULT_NOTIFICATION_PERMISSIONS,
       isOnline: presenceMap.get(u.id)?.isOnline || false,
       lastSeen: presenceMap.get(u.id)?.lastSeen || null,
     }));
@@ -168,9 +157,9 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, username, fullName, role, isActive, newPassword, permissions, notificationPermissions } = body;
+    const { id, username, fullName, role, isActive, newPassword, permissions } = body;
     
-    console.log('Updating user:', id, 'with permissions:', JSON.stringify(permissions), 'notifPermissions:', JSON.stringify(notificationPermissions), 'isActive:', isActive);
+    console.log('Updating user:', id, 'with permissions:', JSON.stringify(permissions), 'isActive:', isActive);
 
     if (!id) {
       return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });
@@ -203,7 +192,6 @@ export async function PATCH(request: NextRequest) {
     if (role) updateData.role = role;
     if (isActive !== undefined) updateData.is_active = isActive;
     if (permissions) updateData.permissions = permissions;
-    if (notificationPermissions) updateData.notification_permissions = notificationPermissions;
 
     // Si hay nueva contraseña, hashearla
     if (newPassword) {

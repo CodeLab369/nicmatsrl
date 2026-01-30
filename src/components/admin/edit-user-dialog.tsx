@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp, Bell, AlertTriangle, Clock, UserCheck, Truck } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, USER_ROLES } from '@/lib/constants';
-import { User, UserPermissions, NotificationPermissions, DEFAULT_NOTIFICATION_PERMISSIONS } from '@/types';
+import { User, UserPermissions } from '@/types';
 import {
   Button,
   Dialog,
@@ -50,9 +50,6 @@ export function EditUserDialog({
     movimientos: true,
     estadisticas: true,
   });
-  const [notifPermissions, setNotifPermissions] = useState<NotificationPermissions>(
-    DEFAULT_NOTIFICATION_PERMISSIONS
-  );
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -94,8 +91,6 @@ export function EditUserDialog({
       movimientos: true,
       estadisticas: true,
     });
-    // Restaurar permisos de notificaciones
-    setNotifPermissions(user.notificationPermissions || DEFAULT_NOTIFICATION_PERMISSIONS);
   }, [user, reset]);
 
   const onSubmit = async (data: UpdateUserFormData) => {
@@ -116,7 +111,6 @@ export function EditUserDialog({
           isActive: data.isActive,
           newPassword: data.newPassword || undefined,
           permissions,
-          notificationPermissions: notifPermissions,
         }),
       });
 
@@ -316,128 +310,6 @@ export function EditUserDialog({
                   <span className="text-sm">Estadísticas</span>
                 </div>
               </label>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Permisos de Notificaciones */}
-          <div className="space-y-3">
-            <Label className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Permisos de Notificaciones
-            </Label>
-            
-            {/* Alta Prioridad */}
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-red-500">Alta Prioridad</span>
-              <div className="grid grid-cols-1 gap-2 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.stockAgotado}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, stockAgotado: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm">Stock Agotado</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.stockBajo}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, stockBajo: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm">Stock Bajo (&lt;5 uds)</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.cotizacionPorVencer}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, cotizacionPorVencer: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm">Cotización por Vencer</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Media Prioridad */}
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-amber-500">Media Prioridad</span>
-              <div className="grid grid-cols-1 gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.nuevaCotizacion}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, nuevaCotizacion: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm">Nueva Cotización</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.cotizacionEstado}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, cotizacionEstado: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Cambio Estado Cotización</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.envioTienda}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, envioTienda: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-purple-500" />
-                    <span className="text-sm">Envío a Tienda</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Baja Prioridad */}
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-muted-foreground">Baja Prioridad</span>
-              <div className="grid grid-cols-1 gap-2 p-3 bg-muted/50 rounded-lg">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={notifPermissions.usuarioConectado}
-                    onCheckedChange={(checked) => 
-                      setNotifPermissions(prev => ({ ...prev, usuarioConectado: checked === true }))
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Usuario Conectado</span>
-                  </div>
-                </label>
-              </div>
             </div>
           </div>
 

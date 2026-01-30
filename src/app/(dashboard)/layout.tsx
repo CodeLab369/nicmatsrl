@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, NotificationProvider } from '@/contexts';
+import { useAuth } from '@/contexts';
 import { ROUTES } from '@/lib/constants';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
@@ -36,16 +36,14 @@ export default function DashboardLayout({
   }
 
   return (
-    <NotificationProvider>
-      <div className="min-h-screen bg-muted/30">
-        {/* Sidebar siempre colapsable */}
-        <div className="">
-          <Header />
-          <main className="p-4 md:p-6 lg:p-8">
-            {children}
-          </main>
-        </div>
+    <div className="min-h-screen bg-muted/30">
+      {/* Sidebar siempre colapsable */}
+      <div className="">
+        <Header />
+        <main className="p-4 md:p-6 lg:p-8">
+          {children}
+        </main>
       </div>
-    </NotificationProvider>
+    </div>
   );
 }
