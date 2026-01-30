@@ -67,8 +67,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { username, password, fullName, role, permissions } = body;
-    
-    console.log('Creating user with permissions:', JSON.stringify(permissions));
 
     if (!username || !password || !fullName || !role) {
       return NextResponse.json(
@@ -158,8 +156,6 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, username, fullName, role, isActive, newPassword, permissions } = body;
-    
-    console.log('Updating user:', id, 'with permissions:', JSON.stringify(permissions), 'isActive:', isActive);
 
     if (!id) {
       return NextResponse.json({ error: 'ID de usuario requerido' }, { status: 400 });

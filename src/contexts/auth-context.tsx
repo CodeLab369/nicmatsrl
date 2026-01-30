@@ -36,8 +36,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Si el usuario fue desactivado, forzar logout
       if (data.forceLogout || response.status === 403) {
-        console.log('Usuario desactivado, cerrando sesión...');
-        // Limpiar cookie de sesión
         await fetch('/api/auth/logout', { method: 'POST' });
         setUser(null);
         router.push(ROUTES.LOGIN);
@@ -88,12 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           filter: `id=eq.${user.id}`
         },
         async (payload) => {
-          console.log('[Auth] Cambio detectado en usuario actual:', payload);
           const newData = payload.new as Record<string, unknown>;
           
           // Si el usuario fue desactivado, forzar logout inmediato
           if (newData && newData.is_active === false) {
-            console.log('[Auth] Usuario desactivado, forzando logout...');
             await fetch('/api/auth/logout', { method: 'POST' });
             setUser(null);
             router.push(ROUTES.LOGIN);
@@ -102,7 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // Actualizar permisos y otros datos en tiempo real
           if (newData) {
-            console.log('[Auth] Actualizando datos del usuario en tiempo real...');
             setUser(prevUser => {
               if (!prevUser) return null;
               return {
@@ -116,9 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[Auth] Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
