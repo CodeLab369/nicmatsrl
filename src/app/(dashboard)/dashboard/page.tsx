@@ -86,7 +86,6 @@ export default function DashboardPage() {
     cotizacionesAceptadas: 0,
     usuarios: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [stockBajo, setStockBajo] = useState<StockBajoAlert | null>(null);
   const [marcasData, setMarcasData] = useState<MarcaData[]>([]);
   const [cotizacionesEstado, setCotizacionesEstado] = useState<CotizacionesPorEstado[]>([]);
@@ -132,8 +131,6 @@ export default function DashboardPage() {
 
     } catch (error) {
       console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -182,7 +179,7 @@ export default function DashboardPage() {
   const statsCards = [
     {
       title: 'Productos',
-      value: loading ? '...' : stats.productos.toString(),
+      value: stats.productos.toString(),
       description: `${stats.unidadesTotal} unidades totales`,
       icon: Package,
       color: 'text-blue-500 bg-blue-500/15 dark:bg-blue-500/20',
@@ -191,7 +188,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Cotizaciones',
-      value: loading ? '...' : stats.cotizacionesTotal.toString(),
+      value: stats.cotizacionesTotal.toString(),
       description: `${stats.cotizacionesPendientes} pendientes`,
       icon: FileText,
       color: 'text-green-500 bg-green-500/15 dark:bg-green-500/20',
@@ -200,7 +197,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Usuarios',
-      value: loading ? '...' : stats.usuarios.toString(),
+      value: stats.usuarios.toString(),
       description: 'En el sistema',
       icon: Users,
       color: 'text-purple-500 bg-purple-500/15 dark:bg-purple-500/20',
@@ -209,7 +206,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Valor Inventario',
-      value: loading ? '...' : formatCurrency(stats.valorInventario),
+      value: formatCurrency(stats.valorInventario),
       description: `Venta: ${formatCurrency(stats.valorVenta)}`,
       icon: TrendingUp,
       color: 'text-amber-500 bg-amber-500/15 dark:bg-amber-500/20',

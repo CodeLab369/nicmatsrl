@@ -40,7 +40,7 @@ interface Stats {
 export default function InventarioPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [stats, setStats] = useState<Stats>({ productos: 0, unidadesTotales: 0, costoTotal: 0, valorVenta: 0 });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Iniciar en false para carga instantánea
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -127,14 +127,13 @@ export default function InventarioPage() {
     setFilterAmperaje('_all'); // Reset amperaje cuando cambia la marca
   }, [filterMarca, fetchAmperajes]);
 
-  // Cargar inventario (showLoading=false para actualizaciones silenciosas de Realtime)
-  const fetchInventory = useCallback(async (showLoading = true) => {
+  // Cargar inventario - siempre silencioso para máxima fluidez
+  const fetchInventory = useCallback(async () => {
     try {
-      if (showLoading) setIsLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        // Timestamp para evitar caché en actualizaciones Realtime
+        // Timestamp para evitar caché
         _t: Date.now().toString(),
       });
       if (search) params.set('search', search);
@@ -157,8 +156,6 @@ export default function InventarioPage() {
     } catch (error) {
       console.error('Error:', error);
       toast({ title: 'Error', description: 'No se pudo cargar el inventario', variant: 'destructive' });
-    } finally {
-      if (showLoading) setIsLoading(false);
     }
   }, [page, limit, search, filterMarca, filterAmperaje, cantidadOp, cantidadVal, toast]);
 
@@ -178,10 +175,10 @@ export default function InventarioPage() {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Suscripción a Realtime centralizada - actualización SILENCIOSA sin spinner
+  // Suscripción a Realtime centralizada - actualización instantánea
   // Usa refs para siempre tener la versión más reciente de las funciones
-  const isRealtime = useTableSubscription('inventory', () => {
-    fetchInventoryRef.current(false); // false = sin mostrar el icono de carga
+  useTableSubscription('inventory', () => {
+    fetchInventoryRef.current();
     fetchMarcasRef.current();
   });
 
@@ -692,13 +689,9 @@ export default function InventarioPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : items.length === 0 ? (
+          {items.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No hay productos en el inventario
+              {stats.productos === 0 ? 'No hay productos en el inventario' : 'No se encontraron productos con los filtros aplicados'}
             </div>
           ) : (
             <>
