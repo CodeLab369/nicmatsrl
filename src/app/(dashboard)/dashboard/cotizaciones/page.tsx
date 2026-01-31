@@ -153,7 +153,6 @@ export default function CotizacionesPage() {
       const data = await response.json();
       if (data.config) {
         setEmpresaConfig(data.config);
-        setConfigForm(data.config);
       }
     } catch (error) {
       console.error('Error fetching config:', error);
