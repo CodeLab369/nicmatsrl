@@ -238,6 +238,7 @@ export default function InventarioPage() {
   
   // Suscripción Realtime para configuración de PDF
   useTableSubscription('pdf_config', () => {
+    console.log('[Inventario] Cambio detectado en pdf_config, recargando...');
     loadPdfConfig();
   });
 
