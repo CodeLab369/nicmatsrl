@@ -591,20 +591,12 @@ export default function InventarioPage() {
 
       const cfg = pdfConfig;
       const fecha = new Date().toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
-      const itemsPorPagina = cfg.itemsPorPagina || 25;
       
       // Calcular totales
       const totalProductos = allItems.length;
       const totalUnidades = allItems.reduce((acc, item) => acc + item.cantidad, 0);
       const totalCosto = allItems.reduce((acc, item) => acc + (item.cantidad * item.costo), 0);
       const totalVenta = allItems.reduce((acc, item) => acc + (item.cantidad * item.precio_venta), 0);
-      
-      // Dividir items en páginas
-      const paginas: InventoryItem[][] = [];
-      for (let i = 0; i < allItems.length; i += itemsPorPagina) {
-        paginas.push(allItems.slice(i, i + itemsPorPagina));
-      }
-      const totalPaginas = paginas.length;
       
       // Función para ajustar color
       const adjustColor = (color: string, amount: number): string => {
@@ -622,9 +614,9 @@ export default function InventarioPage() {
       if (cfg.mostrarTotales && cfg.mostrarCosto) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Costo Total</th>';
       if (cfg.mostrarTotales && cfg.mostrarPrecioVenta) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Venta Total</th>';
       
-      // Generar HTML para cada página
-      const generarFilas = (items: InventoryItem[], startIndex: number) => items.map((item, i) => `
-        <tr style="background-color: ${(startIndex + i) % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+      // Generar filas
+      const filas = allItems.map((item, i) => `
+        <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
           <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; font-size: 9pt;">${item.marca}</td>
           <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; font-size: 9pt;">${item.amperaje}</td>
           <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: center; font-size: 9pt;">
@@ -639,58 +631,6 @@ export default function InventarioPage() {
         </tr>
       `).join('');
       
-      // Generar páginas HTML
-      const paginasHTML = paginas.map((itemsPagina, indexPagina) => {
-        const numPagina = indexPagina + 1;
-        const startIndex = indexPagina * itemsPorPagina;
-        const esPrimeraPagina = numPagina === 1;
-        const esUltimaPagina = numPagina === totalPaginas;
-        
-        return `
-        <div class="page">
-          <!-- Header de página -->
-          <div class="page-header">
-            <div class="header-left">
-              ${cfg.mostrarLogo ? `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>` : ''}
-              <div>
-                <div class="company-name">${cfg.empresa}</div>
-                <div class="doc-title">${cfg.titulo}</div>
-              </div>
-            </div>
-            <div class="header-right">
-              ${cfg.mostrarFecha ? `<div class="fecha">${fecha}</div>` : ''}
-              <div class="page-num">Página ${numPagina} de ${totalPaginas}</div>
-            </div>
-          </div>
-          
-          ${esPrimeraPagina ? `
-          <!-- Resumen solo en primera página -->
-          <div class="stats-row">
-            <div class="stat-item"><div class="stat-value">${totalProductos}</div><div class="stat-label">Productos</div></div>
-            <div class="stat-item"><div class="stat-value">${totalUnidades.toLocaleString('es-BO')}</div><div class="stat-label">Unidades</div></div>
-            ${cfg.mostrarCosto ? `<div class="stat-item"><div class="stat-value">Bs. ${totalCosto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Costo Total</div></div>` : ''}
-            ${cfg.mostrarPrecioVenta ? `<div class="stat-item"><div class="stat-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Valor Venta</div></div>` : ''}
-          </div>
-          ` : ''}
-          
-          <!-- Tabla -->
-          <table>
-            <thead><tr>${columnas}</tr></thead>
-            <tbody>${generarFilas(itemsPagina, startIndex)}</tbody>
-          </table>
-          
-          <!-- Footer de página -->
-          <div class="page-footer">
-            <div class="footer-left">${cfg.empresa} | ${cfg.subtitulo}</div>
-            <div class="footer-center">
-              ${esUltimaPagina ? `<strong>TOTAL: ${totalProductos} productos | ${totalUnidades.toLocaleString('es-BO')} unidades</strong>` : `Items ${startIndex + 1} - ${startIndex + itemsPagina.length} de ${totalProductos}`}
-            </div>
-            <div class="footer-right">Página ${numPagina}/${totalPaginas}</div>
-          </div>
-        </div>
-        `;
-      }).join('');
-      
       const html = `
 <!DOCTYPE html>
 <html lang="es">
@@ -698,25 +638,12 @@ export default function InventarioPage() {
   <meta charset="UTF-8">
   <title>${cfg.titulo}</title>
   <style>
-    @page { 
-      size: letter; 
-      margin: 10mm 10mm 15mm 10mm;
-    }
-    @media print {
-      html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      .page { page-break-after: always; }
-      .page:last-child { page-break-after: avoid; }
-    }
+    @page { size: letter; margin: 15mm; }
+    @media print { html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 9pt; color: #333; line-height: 1.3; }
     
-    .page {
-      position: relative;
-      min-height: 100vh;
-      padding-bottom: 40px;
-    }
-    
-    .page-header {
+    .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -736,7 +663,6 @@ export default function InventarioPage() {
     .doc-title { font-size: 9pt; color: #666; }
     .header-right { text-align: right; }
     .fecha { font-size: 9pt; color: #666; }
-    .page-num { font-size: 10pt; font-weight: 600; color: ${cfg.colorPrincipal}; }
     
     .stats-row {
       display: flex;
@@ -759,26 +685,49 @@ export default function InventarioPage() {
     thead th { font-weight: 600; }
     tbody tr:hover { background-color: #f0f9ff !important; }
     
-    .page-footer {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .footer {
+      margin-top: 15px;
       padding-top: 8px;
       border-top: 1px solid #e9ecef;
+      text-align: center;
       font-size: 8pt;
       color: #666;
     }
-    .footer-left { flex: 1; }
-    .footer-center { flex: 2; text-align: center; }
-    .footer-right { flex: 1; text-align: right; color: ${cfg.colorPrincipal}; font-weight: 600; }
   </style>
 </head>
 <body>
-  ${paginasHTML}
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      ${cfg.mostrarLogo ? `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>` : ''}
+      <div>
+        <div class="company-name">${cfg.empresa}</div>
+        <div class="doc-title">${cfg.titulo}</div>
+      </div>
+    </div>
+    <div class="header-right">
+      ${cfg.mostrarFecha ? `<div class="fecha">${fecha}</div>` : ''}
+    </div>
+  </div>
+  
+  <!-- Resumen -->
+  <div class="stats-row">
+    <div class="stat-item"><div class="stat-value">${totalProductos}</div><div class="stat-label">Productos</div></div>
+    <div class="stat-item"><div class="stat-value">${totalUnidades.toLocaleString('es-BO')}</div><div class="stat-label">Unidades</div></div>
+    ${cfg.mostrarCosto ? `<div class="stat-item"><div class="stat-value">Bs. ${totalCosto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Costo Total</div></div>` : ''}
+    ${cfg.mostrarPrecioVenta ? `<div class="stat-item"><div class="stat-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Valor Venta</div></div>` : ''}
+  </div>
+  
+  <!-- Tabla -->
+  <table>
+    <thead><tr>${columnas}</tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+  
+  <!-- Footer -->
+  <div class="footer">
+    ${cfg.empresa} | ${cfg.subtitulo} | Total: ${totalProductos} productos, ${totalUnidades.toLocaleString('es-BO')} unidades
+  </div>
 </body>
 </html>`;
 
@@ -1599,27 +1548,6 @@ export default function InventarioPage() {
                   checked={pdfConfig.mostrarFecha} 
                   onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarFecha: checked})}
                 />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Productos por Página</Label>
-                <Select 
-                  value={pdfConfig.itemsPorPagina.toString()} 
-                  onValueChange={(v) => setPdfConfig({...pdfConfig, itemsPorPagina: parseInt(v)})}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 productos</SelectItem>
-                    <SelectItem value="20">20 productos</SelectItem>
-                    <SelectItem value="25">25 productos</SelectItem>
-                    <SelectItem value="30">30 productos</SelectItem>
-                    <SelectItem value="35">35 productos</SelectItem>
-                    <SelectItem value="40">40 productos</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Cantidad de productos por página en el PDF</p>
               </div>
             </TabsContent>
             
