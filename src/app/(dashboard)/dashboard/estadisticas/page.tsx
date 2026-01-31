@@ -765,21 +765,21 @@ export default function EstadisticasPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground">Costo Total</p>
-                    <p className="text-xl font-bold">{formatCurrency(data.totales.total_costo)}</p>
+                    <p className="text-xl font-bold">{formatCurrency(data.totales.total_costo ?? 0)}</p>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground">Valor de Ventas</p>
-                    <p className="text-xl font-bold">{formatCurrency(data.totales.total_valor)}</p>
+                    <p className="text-xl font-bold">{formatCurrency(data.totales.total_valor ?? 0)}</p>
                   </div>
                   <div className="p-4 bg-green-500/10 rounded-lg">
                     <p className="text-sm text-muted-foreground">Ganancia Bruta</p>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(data.totales.total_ganancia)}</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(data.totales.total_ganancia ?? 0)}</p>
                   </div>
                   <div className="p-4 bg-blue-500/10 rounded-lg">
                     <p className="text-sm text-muted-foreground">Margen de Ganancia</p>
                     <p className="text-xl font-bold text-blue-600">
-                      {data.totales.total_valor > 0 
-                        ? ((data.totales.total_ganancia / data.totales.total_valor) * 100).toFixed(1) 
+                      {(data.totales.total_valor ?? 0) > 0 
+                        ? (((data.totales.total_ganancia ?? 0) / (data.totales.total_valor ?? 1)) * 100).toFixed(1) 
                         : 0}%
                     </p>
                   </div>
