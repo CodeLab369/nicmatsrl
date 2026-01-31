@@ -121,28 +121,26 @@ export default function ProfilePage() {
     try {
       setIsUpdatingPassword(true);
 
-      // Verificar contraseña actual autenticando de nuevo
-      const email = `${user?.username.toLowerCase()}@nicmat.local`;
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password: data.currentPassword,
+      // Usar la nueva API para cambiar contraseña
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+        }),
       });
 
-      if (authError) {
+      const result = await response.json();
+
+      if (!response.ok) {
         toast({
           title: 'Error',
-          description: 'La contraseña actual es incorrecta',
+          description: result.error || 'Error al cambiar la contraseña',
           variant: 'destructive',
         });
         return;
       }
-
-      // Actualizar contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: data.newPassword,
-      });
-
-      if (updateError) throw updateError;
 
       passwordForm.reset();
 
