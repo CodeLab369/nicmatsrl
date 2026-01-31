@@ -15,3 +15,4 @@ export { Badge } from './badge';
 export { LoadingSpinner, PageLoader, TableSkeleton, CardSkeleton } from './loading';
 export { Checkbox } from './checkbox';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
+export { Switch } from './switch';

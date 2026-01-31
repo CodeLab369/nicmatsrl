@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
-  ChevronLeft, ChevronRight, X, RefreshCw, AlertCircle, ArrowRight
+  ChevronLeft, ChevronRight, X, RefreshCw, AlertCircle, ArrowRight,
+  FileText, Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -17,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Switch, Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
 
 interface InventoryItem {
@@ -66,6 +68,21 @@ export default function InventarioPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
+  // PDF state
+  const [pdfConfigOpen, setPdfConfigOpen] = useState(false);
+  const [pdfConfig, setPdfConfig] = useState({
+    titulo: 'INVENTARIO DE BATERÍAS',
+    subtitulo: 'Listado completo de productos en stock',
+    empresa: 'NICMAT S.R.L.',
+    colorPrincipal: '#1a5f7a',
+    mostrarCosto: true,
+    mostrarPrecioVenta: true,
+    mostrarTotales: true,
+    mostrarFecha: true,
+    mostrarLogo: true,
+    logo: '',
+  });
+  
   // Import state
   const [importData, setImportData] = useState<any[]>([]);
   const [importAnalysis, setImportAnalysis] = useState<any>(null);
@@ -85,6 +102,21 @@ export default function InventarioPage() {
   const [addMode, setAddMode] = useState<'new' | 'restock'>('new');
   
   const { toast } = useToast();
+  
+  // Cargar configuración PDF desde localStorage
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('inventoryPdfConfig');
+    if (savedConfig) {
+      setPdfConfig(JSON.parse(savedConfig));
+    }
+  }, []);
+  
+  // Guardar configuración PDF
+  const savePdfConfig = () => {
+    localStorage.setItem('inventoryPdfConfig', JSON.stringify(pdfConfig));
+    toast({ title: 'Configuración guardada', description: 'La configuración del PDF se ha guardado' });
+    setPdfConfigOpen(false);
+  };
 
   // Cargar marcas disponibles
   const fetchMarcas = useCallback(async () => {
@@ -523,6 +555,150 @@ export default function InventarioPage() {
     setEditDialogOpen(true);
   };
 
+  // Generar PDF del inventario
+  const generatePDF = async () => {
+    try {
+      // Obtener TODOS los productos (sin paginación)
+      const response = await fetch('/api/inventory?noPagination=true');
+      const data = await response.json();
+      const allItems: InventoryItem[] = data.items || [];
+      
+      if (allItems.length === 0) {
+        toast({ title: 'Sin datos', description: 'No hay productos para generar el PDF', variant: 'destructive' });
+        return;
+      }
+
+      const cfg = pdfConfig;
+      const fecha = new Date().toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+      
+      // Calcular totales
+      const totalProductos = allItems.length;
+      const totalUnidades = allItems.reduce((acc, item) => acc + item.cantidad, 0);
+      const totalCosto = allItems.reduce((acc, item) => acc + (item.cantidad * item.costo), 0);
+      const totalVenta = allItems.reduce((acc, item) => acc + (item.cantidad * item.precio_venta), 0);
+      
+      // Función para ajustar color
+      const adjustColor = (color: string, amount: number): string => {
+        const hex = color.replace('#', '');
+        const r = Math.min(255, Math.max(0, parseInt(hex.substring(0, 2), 16) + amount));
+        const g = Math.min(255, Math.max(0, parseInt(hex.substring(2, 4), 16) + amount));
+        const b = Math.min(255, Math.max(0, parseInt(hex.substring(4, 6), 16) + amount));
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      };
+      
+      // Generar filas de productos
+      const productosHTML = allItems.map((item, i) => `
+        <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef;">${item.marca}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef;">${item.amperaje}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: center; font-weight: 600;">
+            <span style="background: ${item.cantidad > 0 ? '#dcfce7' : '#fee2e2'}; color: ${item.cantidad > 0 ? '#166534' : '#991b1b'}; padding: 2px 8px; border-radius: 4px;">
+              ${item.cantidad}
+            </span>
+          </td>
+          ${cfg.mostrarCosto ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${item.costo.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarPrecioVenta ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${item.precio_venta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarTotales && cfg.mostrarCosto ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 500;">Bs. ${(item.cantidad * item.costo).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarTotales && cfg.mostrarPrecioVenta ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 500;">Bs. ${(item.cantidad * item.precio_venta).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+        </tr>
+      `).join('');
+      
+      // Columnas dinámicas
+      let columnas = '<th style="padding: 12px; text-align: left;">Marca</th><th style="padding: 12px; text-align: left;">Amperaje</th><th style="padding: 12px; text-align: center;">Cantidad</th>';
+      if (cfg.mostrarCosto) columnas += '<th style="padding: 12px; text-align: right;">Costo Unit.</th>';
+      if (cfg.mostrarPrecioVenta) columnas += '<th style="padding: 12px; text-align: right;">Precio Venta</th>';
+      if (cfg.mostrarTotales && cfg.mostrarCosto) columnas += '<th style="padding: 12px; text-align: right;">Costo Total</th>';
+      if (cfg.mostrarTotales && cfg.mostrarPrecioVenta) columnas += '<th style="padding: 12px; text-align: right;">Venta Total</th>';
+      
+      const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${cfg.titulo}</title>
+  <style>
+    @page { size: letter; margin: 15mm; }
+    @media print {
+      html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 3px solid ${cfg.colorPrincipal}; margin-bottom: 20px; }
+    .logo-section { display: flex; align-items: center; gap: 15px; }
+    .logo-placeholder { width: 60px; height: 60px; background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 40)} 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: bold; }
+    .company-name { font-size: 22pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
+    .date-section { text-align: right; }
+    .date-label { font-size: 9pt; color: #666; }
+    .date-value { font-size: 11pt; font-weight: 600; color: ${cfg.colorPrincipal}; }
+    .title-section { text-align: center; margin-bottom: 20px; }
+    .main-title { font-size: 18pt; font-weight: 700; color: ${cfg.colorPrincipal}; letter-spacing: 2px; }
+    .subtitle { font-size: 10pt; color: #666; margin-top: 5px; }
+    .stats-row { display: flex; justify-content: space-around; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 16pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
+    .stat-label { font-size: 9pt; color: #666; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 30)} 100%); color: white; }
+    thead th { padding: 12px; font-weight: 600; }
+    .footer { margin-top: 20px; padding-top: 15px; border-top: 2px solid #e9ecef; display: flex; justify-content: space-between; }
+    .footer-totals { display: flex; gap: 30px; }
+    .footer-total { text-align: right; }
+    .footer-total-label { font-size: 9pt; color: #666; }
+    .footer-total-value { font-size: 14pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
+    .footer-generated { font-size: 8pt; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-section">
+      ${cfg.mostrarLogo ? (cfg.logo ? `<img src="${cfg.logo}" style="width: 60px; height: 60px; object-fit: contain; border-radius: 10px;">` : `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>`) : ''}
+      <div class="company-name">${cfg.empresa}</div>
+    </div>
+    ${cfg.mostrarFecha ? `<div class="date-section"><div class="date-label">Fecha de generación</div><div class="date-value">${fecha}</div></div>` : ''}
+  </div>
+  
+  <div class="title-section">
+    <div class="main-title">${cfg.titulo}</div>
+    <div class="subtitle">${cfg.subtitulo}</div>
+  </div>
+  
+  <div class="stats-row">
+    <div class="stat-item"><div class="stat-value">${totalProductos}</div><div class="stat-label">Productos</div></div>
+    <div class="stat-item"><div class="stat-value">${totalUnidades.toLocaleString('es-BO')}</div><div class="stat-label">Unidades Totales</div></div>
+    ${cfg.mostrarCosto ? `<div class="stat-item"><div class="stat-value">Bs. ${totalCosto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Costo Total</div></div>` : ''}
+    ${cfg.mostrarPrecioVenta ? `<div class="stat-item"><div class="stat-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Valor de Venta</div></div>` : ''}
+  </div>
+  
+  <table>
+    <thead><tr>${columnas}</tr></thead>
+    <tbody>${productosHTML}</tbody>
+  </table>
+  
+  <div class="footer">
+    <div class="footer-generated">Generado el ${fecha} | ${cfg.empresa}</div>
+    <div class="footer-totals">
+      <div class="footer-total"><div class="footer-total-label">Total Productos</div><div class="footer-total-value">${totalProductos}</div></div>
+      <div class="footer-total"><div class="footer-total-label">Total Unidades</div><div class="footer-total-value">${totalUnidades.toLocaleString('es-BO')}</div></div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({ title: 'Error', description: 'No se pudo abrir la ventana de impresión', variant: 'destructive' });
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.onload = () => printWindow.print();
+      
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      toast({ title: 'Error', description: 'Error al generar el PDF', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -549,6 +725,12 @@ export default function InventarioPage() {
           </label>
           <Button variant="outline" onClick={handleExport} disabled={items.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar
+          </Button>
+          <Button variant="outline" onClick={generatePDF} disabled={items.length === 0}>
+            <FileText className="mr-2 h-4 w-4" /> PDF
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setPdfConfigOpen(true)} title="Configurar PDF">
+            <Settings className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={handleDownloadFormat}>
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Formato
@@ -1233,6 +1415,156 @@ export default function InventarioPage() {
             </Button>
             <Button onClick={executeImport} disabled={isSubmitting}>
               {isSubmitting ? 'Importando...' : `Importar ${importAnalysis?.total || 0} productos`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Configuración PDF */}
+      <Dialog open={pdfConfigOpen} onOpenChange={setPdfConfigOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configurar PDF de Inventario
+            </DialogTitle>
+            <DialogDescription>
+              Personaliza la apariencia del PDF. Esta configuración es exclusiva para el inventario.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="columnas">Columnas</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="general" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Nombre de Empresa</Label>
+                <Input 
+                  value={pdfConfig.empresa} 
+                  onChange={(e) => setPdfConfig({...pdfConfig, empresa: e.target.value})}
+                  placeholder="NICMAT S.R.L."
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Título del PDF</Label>
+                <Input 
+                  value={pdfConfig.titulo} 
+                  onChange={(e) => setPdfConfig({...pdfConfig, titulo: e.target.value})}
+                  placeholder="INVENTARIO DE BATERÍAS"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Subtítulo</Label>
+                <Input 
+                  value={pdfConfig.subtitulo} 
+                  onChange={(e) => setPdfConfig({...pdfConfig, subtitulo: e.target.value})}
+                  placeholder="Listado completo de productos"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Color Principal</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="color"
+                    value={pdfConfig.colorPrincipal} 
+                    onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
+                    className="w-16 h-10 p-1 cursor-pointer"
+                  />
+                  <Input 
+                    value={pdfConfig.colorPrincipal} 
+                    onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
+                    placeholder="#1a5f7a"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="mostrar-logo">Mostrar Logo/Iniciales</Label>
+                <Switch 
+                  id="mostrar-logo"
+                  checked={pdfConfig.mostrarLogo} 
+                  onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarLogo: checked})}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="mostrar-fecha">Mostrar Fecha</Label>
+                <Switch 
+                  id="mostrar-fecha"
+                  checked={pdfConfig.mostrarFecha} 
+                  onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarFecha: checked})}
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="columnas" className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Selecciona qué columnas mostrar en el PDF del inventario.
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-2 rounded border">
+                  <div>
+                    <Label>Costo Unitario</Label>
+                    <p className="text-xs text-muted-foreground">Mostrar columna de costo por unidad</p>
+                  </div>
+                  <Switch 
+                    checked={pdfConfig.mostrarCosto} 
+                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarCosto: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-2 rounded border">
+                  <div>
+                    <Label>Precio de Venta</Label>
+                    <p className="text-xs text-muted-foreground">Mostrar columna de precio de venta</p>
+                  </div>
+                  <Switch 
+                    checked={pdfConfig.mostrarPrecioVenta} 
+                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarPrecioVenta: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-2 rounded border">
+                  <div>
+                    <Label>Columnas de Totales</Label>
+                    <p className="text-xs text-muted-foreground">Mostrar costo total y venta total por producto</p>
+                  </div>
+                  <Switch 
+                    checked={pdfConfig.mostrarTotales} 
+                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarTotales: checked})}
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-muted rounded-lg">
+                <p className="text-xs font-medium mb-2">Vista previa de columnas:</p>
+                <div className="flex flex-wrap gap-1 text-xs">
+                  <Badge variant="secondary">Marca</Badge>
+                  <Badge variant="secondary">Amperaje</Badge>
+                  <Badge variant="secondary">Cantidad</Badge>
+                  {pdfConfig.mostrarCosto && <Badge>Costo Unit.</Badge>}
+                  {pdfConfig.mostrarPrecioVenta && <Badge>Precio Venta</Badge>}
+                  {pdfConfig.mostrarTotales && pdfConfig.mostrarCosto && <Badge variant="outline">Costo Total</Badge>}
+                  {pdfConfig.mostrarTotales && pdfConfig.mostrarPrecioVenta && <Badge variant="outline">Venta Total</Badge>}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPdfConfigOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={savePdfConfig}>
+              Guardar Configuración
             </Button>
           </DialogFooter>
         </DialogContent>
