@@ -1512,7 +1512,7 @@ export default function InventarioPage() {
 
       {/* Modal Configuración PDF */}
       <Dialog open={pdfConfigOpen} onOpenChange={setPdfConfigOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
@@ -1532,20 +1532,20 @@ export default function InventarioPage() {
             <TabsContent value="general" className="space-y-4 mt-4">
               {/* Logo */}
               <div className="space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
+                <Label className="text-sm font-semibold flex items-center gap-2">
                   <Upload className="h-4 w-4" /> Logo de la Empresa
                 </Label>
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted">
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted flex-shrink-0">
                     {pdfConfig.logo ? (
                       <img src={pdfConfig.logo} alt="Logo" className="w-full h-full object-contain" />
                     ) : (
-                      <div className="text-2xl font-bold text-muted-foreground">
+                      <div className="text-xl font-bold text-muted-foreground">
                         {pdfConfig.empresa?.substring(0, 2).toUpperCase() || 'NM'}
                       </div>
                     )}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <input
                       type="file"
                       ref={logoInputRef}
@@ -1553,79 +1553,84 @@ export default function InventarioPage() {
                       onChange={handleLogoUpload}
                       className="hidden"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => logoInputRef.current?.click()}
-                    >
-                      <Upload className="mr-2 h-3 w-3" />
-                      Subir Logo
-                    </Button>
-                    {pdfConfig.logo && (
+                    <div className="flex gap-2">
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={handleRemoveLogo}
-                        className="text-destructive"
+                        onClick={() => logoInputRef.current?.click()}
                       >
-                        <Trash2 className="mr-2 h-3 w-3" />
-                        Quitar
+                        <Upload className="mr-1 h-3 w-3" />
+                        Subir
                       </Button>
-                    )}
-                    <p className="text-xs text-muted-foreground">PNG, JPG o SVG. Máx. 500KB</p>
+                      {pdfConfig.logo && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveLogo}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" />
+                          Quitar
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, SVG. Máx 500KB</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Nombre de Empresa</Label>
+              <div className="space-y-1">
+                <Label className="text-sm">Nombre de Empresa</Label>
                 <Input 
                   value={pdfConfig.empresa} 
                   onChange={(e) => setPdfConfig({...pdfConfig, empresa: e.target.value})}
                   placeholder="NICMAT S.R.L."
+                  className="h-9"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label>Título del PDF</Label>
+              <div className="space-y-1">
+                <Label className="text-sm">Título del PDF</Label>
                 <Input 
                   value={pdfConfig.titulo} 
                   onChange={(e) => setPdfConfig({...pdfConfig, titulo: e.target.value})}
                   placeholder="INVENTARIO DE BATERÍAS"
+                  className="h-9"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label>Subtítulo</Label>
+              <div className="space-y-1">
+                <Label className="text-sm">Subtítulo</Label>
                 <Input 
                   value={pdfConfig.subtitulo} 
                   onChange={(e) => setPdfConfig({...pdfConfig, subtitulo: e.target.value})}
                   placeholder="Listado completo de productos"
+                  className="h-9"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label>Color Principal</Label>
+              <div className="space-y-1">
+                <Label className="text-sm">Color Principal</Label>
                 <div className="flex gap-2">
                   <Input 
                     type="color"
                     value={pdfConfig.colorPrincipal} 
                     onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
-                    className="w-16 h-10 p-1 cursor-pointer"
+                    className="w-12 h-9 p-1 cursor-pointer"
                   />
                   <Input 
                     value={pdfConfig.colorPrincipal} 
                     onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
                     placeholder="#1a5f7a"
-                    className="flex-1"
+                    className="flex-1 h-9"
                   />
                 </div>
               </div>
               
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mostrar-logo">Mostrar Logo/Iniciales</Label>
+              <div className="flex items-center justify-between py-1">
+                <Label htmlFor="mostrar-logo" className="text-sm">Mostrar Logo/Iniciales</Label>
                 <Switch 
                   id="mostrar-logo"
                   checked={pdfConfig.mostrarLogo} 
@@ -1633,8 +1638,8 @@ export default function InventarioPage() {
                 />
               </div>
               
-              <div className="flex items-center justify-between">
-                <Label htmlFor="mostrar-fecha">Mostrar Fecha</Label>
+              <div className="flex items-center justify-between py-1">
+                <Label htmlFor="mostrar-fecha" className="text-sm">Mostrar Fecha</Label>
                 <Switch 
                   id="mostrar-fecha"
                   checked={pdfConfig.mostrarFecha} 
@@ -1643,16 +1648,16 @@ export default function InventarioPage() {
               </div>
             </TabsContent>
             
-            <TabsContent value="columnas" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Selecciona qué columnas mostrar en el PDF del inventario.
+            <TabsContent value="columnas" className="space-y-3 mt-4">
+              <p className="text-xs text-muted-foreground">
+                Selecciona qué columnas mostrar en el PDF.
               </p>
               
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 rounded border">
                   <div>
-                    <Label>Costo Unitario</Label>
-                    <p className="text-xs text-muted-foreground">Mostrar columna de costo por unidad</p>
+                    <Label className="text-sm">Costo Unitario</Label>
+                    <p className="text-xs text-muted-foreground">Columna de costo por unidad</p>
                   </div>
                   <Switch 
                     checked={pdfConfig.mostrarCosto} 
@@ -1662,8 +1667,8 @@ export default function InventarioPage() {
                 
                 <div className="flex items-center justify-between p-2 rounded border">
                   <div>
-                    <Label>Precio de Venta</Label>
-                    <p className="text-xs text-muted-foreground">Mostrar columna de precio de venta</p>
+                    <Label className="text-sm">Precio de Venta</Label>
+                    <p className="text-xs text-muted-foreground">Columna de precio de venta</p>
                   </div>
                   <Switch 
                     checked={pdfConfig.mostrarPrecioVenta} 
@@ -1673,8 +1678,8 @@ export default function InventarioPage() {
                 
                 <div className="flex items-center justify-between p-2 rounded border">
                   <div>
-                    <Label>Columnas de Totales</Label>
-                    <p className="text-xs text-muted-foreground">Mostrar costo total y venta total por producto</p>
+                    <Label className="text-sm">Columnas de Totales</Label>
+                    <p className="text-xs text-muted-foreground">Costo total y venta total por producto</p>
                   </div>
                   <Switch 
                     checked={pdfConfig.mostrarTotales} 
@@ -1683,22 +1688,22 @@ export default function InventarioPage() {
                 </div>
               </div>
               
-              <div className="mt-4 p-3 bg-muted rounded-lg">
-                <p className="text-xs font-medium mb-2">Vista previa de columnas:</p>
+              <div className="p-2 bg-muted rounded-lg">
+                <p className="text-xs font-medium mb-1">Columnas:</p>
                 <div className="flex flex-wrap gap-1 text-xs">
-                  <Badge variant="secondary">Marca</Badge>
-                  <Badge variant="secondary">Amperaje</Badge>
-                  <Badge variant="secondary">Cantidad</Badge>
-                  {pdfConfig.mostrarCosto && <Badge>Costo Unit.</Badge>}
-                  {pdfConfig.mostrarPrecioVenta && <Badge>Precio Venta</Badge>}
-                  {pdfConfig.mostrarTotales && pdfConfig.mostrarCosto && <Badge variant="outline">Costo Total</Badge>}
-                  {pdfConfig.mostrarTotales && pdfConfig.mostrarPrecioVenta && <Badge variant="outline">Venta Total</Badge>}
+                  <Badge variant="secondary" className="text-xs">Marca</Badge>
+                  <Badge variant="secondary" className="text-xs">Amperaje</Badge>
+                  <Badge variant="secondary" className="text-xs">Cantidad</Badge>
+                  {pdfConfig.mostrarCosto && <Badge className="text-xs">Costo</Badge>}
+                  {pdfConfig.mostrarPrecioVenta && <Badge className="text-xs">Precio</Badge>}
+                  {pdfConfig.mostrarTotales && pdfConfig.mostrarCosto && <Badge variant="outline" className="text-xs">Total Costo</Badge>}
+                  {pdfConfig.mostrarTotales && pdfConfig.mostrarPrecioVenta && <Badge variant="outline" className="text-xs">Total Venta</Badge>}
                 </div>
               </div>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setPdfConfigOpen(false)}>
               Cancelar
             </Button>
