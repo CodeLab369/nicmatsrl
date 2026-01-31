@@ -783,11 +783,6 @@ export default function MovimientosPage() {
                           Encargado: <span className="font-medium text-foreground">{selectedTienda.encargado}</span>
                         </p>
                       )}
-                      <p className="text-sm text-muted-foreground">
-                        Balance del período: <span className={selectedTienda.balanceNeto >= 0 ? 'text-green-600' : 'text-red-600'}>
-                          {formatCurrency(selectedTienda.balanceNeto)}
-                        </span>
-                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={handleOpenRegistrarVenta} size="sm" className="gap-1 flex-1 sm:flex-none">
@@ -798,6 +793,24 @@ export default function MovimientosPage() {
                         <Plus className="h-4 w-4" />
                         <span className="hidden xs:inline">Agregar</span> Gasto
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Stats de la tienda */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                      <p className="text-xs text-muted-foreground">Total Ventas</p>
+                      <p className="text-lg font-bold">{formatCurrency(selectedTienda.ventas.total)}</p>
+                    </div>
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                      <p className="text-xs text-muted-foreground">Total Gastos</p>
+                      <p className="text-lg font-bold">{formatCurrency(selectedTienda.gastos.total)}</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center ${selectedTienda.ventas.total - selectedTienda.gastos.total >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className={`text-lg font-bold ${selectedTienda.ventas.total - selectedTienda.gastos.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(selectedTienda.ventas.total - selectedTienda.gastos.total)}
+                      </p>
                     </div>
                   </div>
 
@@ -826,22 +839,6 @@ export default function MovimientosPage() {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {/* Resumen de totales */}
-                          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <div>
-                              <p className="text-xs md:text-sm text-muted-foreground">Total Ventas</p>
-                              <p className="text-lg md:text-xl font-bold">{formatCurrency(selectedTienda.ventas.total)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs md:text-sm text-muted-foreground">Total Ganancia</p>
-                              <p className="text-lg md:text-xl font-bold text-green-600">{formatCurrency(selectedTienda.ventas.ganancia)}</p>
-                            </div>
-                            <div className="col-span-2 md:col-span-1">
-                              <p className="text-xs md:text-sm text-muted-foreground">Cantidad de Ventas</p>
-                              <p className="text-lg md:text-xl font-bold">{selectedTienda.ventas.cantidad}</p>
-                            </div>
-                          </div>
-
                           {ventas.map((venta) => (
                             <div key={venta.id} className="border rounded-lg overflow-hidden">
                               {/* Header de la venta */}
