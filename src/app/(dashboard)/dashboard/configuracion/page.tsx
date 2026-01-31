@@ -320,9 +320,9 @@ export default function ConfiguracionPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 items-start">
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Dirección</Label>
+                  <Label>Dirección</Label>
                   <Input
                     value={empresaConfig.direccion}
                     onChange={(e) => setEmpresaConfig(prev => ({ ...prev, direccion: e.target.value }))}
@@ -342,9 +342,9 @@ export default function ConfiguracionPage() {
               <Separator />
 
               {/* Contacto */}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 items-start">
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Phone className="h-3 w-3" /> Teléfono Principal</Label>
+                  <Label>Teléfono Principal</Label>
                   <Input
                     value={empresaConfig.telefono_principal}
                     onChange={(e) => setEmpresaConfig(prev => ({ ...prev, telefono_principal: e.target.value }))}
@@ -368,7 +368,7 @@ export default function ConfiguracionPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
+                  <Label>Email</Label>
                   <Input
                     type="email"
                     value={empresaConfig.email}
@@ -385,9 +385,9 @@ export default function ConfiguracionPage() {
                 <h3 className="font-semibold flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Configuración de Cotizaciones
                 </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 items-start">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1"><Hash className="h-3 w-3" /> Prefijo de Cotización</Label>
+                    <Label>Prefijo de Cotización</Label>
                     <Input
                       value={empresaConfig.prefijo_cotizacion}
                       onChange={(e) => setEmpresaConfig(prev => ({ ...prev, prefijo_cotizacion: e.target.value }))}
