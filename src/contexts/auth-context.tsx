@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  // Suscripción Realtime para detectar cambios en el usuario actual (desactivación y permisos)
+  // Suscripción Realtime para detectar cambios en el usuario actual (desactivación, permisos y eliminación)
   useEffect(() => {
     if (!user) return;
 
@@ -109,6 +109,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               };
             });
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'DELETE', 
+          schema: 'public', 
+          table: 'users',
+          filter: `id=eq.${user.id}`
+        },
+        async () => {
+          // Usuario eliminado, forzar logout inmediato
+          await fetch('/api/auth/logout', { method: 'POST' });
+          setUser(null);
+          router.push(ROUTES.LOGIN);
         }
       )
       .subscribe();
