@@ -29,6 +29,7 @@ interface TiendaResumen {
   id: string;
   nombre: string;
   tipo: string;
+  encargado: string | null;
   ventas: {
     cantidad: number;
     total: number;
@@ -777,6 +778,11 @@ export default function MovimientosPage() {
                         <Store className="h-5 w-5" />
                         {selectedTienda.nombre}
                       </h3>
+                      {selectedTienda.encargado && (
+                        <p className="text-sm text-muted-foreground">
+                          Encargado: <span className="font-medium text-foreground">{selectedTienda.encargado}</span>
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         Balance del período: <span className={selectedTienda.balanceNeto >= 0 ? 'text-green-600' : 'text-red-600'}>
                           {formatCurrency(selectedTienda.balanceNeto)}

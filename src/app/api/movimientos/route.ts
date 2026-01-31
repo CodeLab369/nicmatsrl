@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // 2. Obtener todas las tiendas para el resumen
     const { data: tiendas } = await supabase
       .from('tiendas')
-      .select('id, nombre, tipo')
+      .select('id, nombre, tipo, encargado')
       .order('nombre');
 
     // 3. Obtener ventas de tiendas
@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
         id: tienda.id,
         nombre: tienda.nombre,
         tipo: tienda.tipo,
+        encargado: tienda.encargado,
         ventas: {
           cantidad: ventasTienda.length,
           total: totalVentas,
