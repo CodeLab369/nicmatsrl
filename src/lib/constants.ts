@@ -61,6 +61,9 @@ export const ROUTES = {
   
   // Movimientos (Control Financiero)
   MOVEMENTS: '/dashboard/movimientos',
+  
+  // Configuración
+  SETTINGS: '/dashboard/configuracion',
 } as const;
 
 // Mensajes de error comunes

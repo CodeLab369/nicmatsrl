@@ -90,6 +90,12 @@ const navigation: NavGroup[] = [
     title: 'Administración',
     items: [
       {
+        title: 'Configuración',
+        href: ROUTES.SETTINGS,
+        icon: Settings,
+        roles: [USER_ROLES.ADMIN],
+      },
+      {
         title: 'Usuarios',
         href: ROUTES.ADMIN_USERS,
         icon: Users,

@@ -5,7 +5,7 @@ import {
   Plus, Search, Upload, Download, FileSpreadsheet, Trash2,
   Eye, Edit2, Package, Boxes, DollarSign, TrendingUp,
   ChevronLeft, ChevronRight, X, RefreshCw, AlertCircle, ArrowRight,
-  FileText, Settings
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -18,7 +18,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  Switch, Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
 
 interface InventoryItem {
@@ -68,9 +67,7 @@ export default function InventarioPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
-  // PDF state
-  const [pdfConfigOpen, setPdfConfigOpen] = useState(false);
-  const [pdfConfigLoading, setPdfConfigLoading] = useState(false);
+  // PDF state (se carga desde configuración centralizada)
   const [pdfConfig, setPdfConfig] = useState({
     titulo: 'INVENTARIO DE BATERÍAS',
     subtitulo: 'Listado completo de productos en stock',
@@ -81,10 +78,8 @@ export default function InventarioPage() {
     mostrarTotales: true,
     mostrarFecha: true,
     mostrarLogo: true,
-    itemsPorPagina: 25,
     logo: null as string | null,
   });
-  const logoInputRef = useRef<HTMLInputElement>(null);
   
   // Import state
   const [importData, setImportData] = useState<any[]>([]);
@@ -123,53 +118,6 @@ export default function InventarioPage() {
   useEffect(() => {
     loadPdfConfig();
   }, [loadPdfConfig]);
-  
-  // Guardar configuración PDF en la nube
-  const savePdfConfig = async () => {
-    setPdfConfigLoading(true);
-    try {
-      const response = await fetch('/api/pdf-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modulo: 'inventario', config: pdfConfig }),
-      });
-      if (!response.ok) throw new Error();
-      toast({ title: 'Configuración guardada', description: 'La configuración se ha guardado en la nube' });
-      setPdfConfigOpen(false);
-    } catch {
-      toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' });
-    } finally {
-      setPdfConfigLoading(false);
-    }
-  };
-
-  // Manejar subida de logo
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (file.size > 500 * 1024) {
-      toast({ title: 'Error', description: 'El logo debe ser menor a 500KB', variant: 'destructive' });
-      return;
-    }
-    
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'Error', description: 'Solo se permiten imágenes', variant: 'destructive' });
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPdfConfig(prev => ({ ...prev, logo: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Remover logo
-  const handleRemoveLogo = () => {
-    setPdfConfig(prev => ({ ...prev, logo: null }));
-    if (logoInputRef.current) logoInputRef.current.value = '';
-  };
 
   // Cargar marcas disponibles
   const fetchMarcas = useCallback(async () => {
@@ -818,9 +766,6 @@ export default function InventarioPage() {
           </Button>
           <Button variant="outline" onClick={generatePDF} disabled={items.length === 0}>
             <FileText className="mr-2 h-4 w-4" /> PDF
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => setPdfConfigOpen(true)} title="Configurar PDF">
-            <Settings className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={handleDownloadFormat}>
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Formato
@@ -1505,210 +1450,6 @@ export default function InventarioPage() {
             </Button>
             <Button onClick={executeImport} disabled={isSubmitting}>
               {isSubmitting ? 'Importando...' : `Importar ${importAnalysis?.total || 0} productos`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Configuración PDF */}
-      <Dialog open={pdfConfigOpen} onOpenChange={setPdfConfigOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Configurar PDF de Inventario
-            </DialogTitle>
-            <DialogDescription>
-              Personaliza la apariencia del PDF. Esta configuración es exclusiva para el inventario.
-            </DialogDescription>
-          </DialogHeader>
-
-          <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="columnas">Columnas</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="general" className="space-y-4 mt-4">
-              {/* Logo */}
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  <Upload className="h-4 w-4" /> Logo de la Empresa
-                </Label>
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted flex-shrink-0">
-                    {pdfConfig.logo ? (
-                      <img src={pdfConfig.logo} alt="Logo" className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="text-xl font-bold text-muted-foreground">
-                        {pdfConfig.empresa?.substring(0, 2).toUpperCase() || 'NM'}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <input
-                      type="file"
-                      ref={logoInputRef}
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => logoInputRef.current?.click()}
-                      >
-                        <Upload className="mr-1 h-3 w-3" />
-                        Subir
-                      </Button>
-                      {pdfConfig.logo && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleRemoveLogo}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="mr-1 h-3 w-3" />
-                          Quitar
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, SVG. Máx 500KB</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-sm">Nombre de Empresa</Label>
-                <Input 
-                  value={pdfConfig.empresa} 
-                  onChange={(e) => setPdfConfig({...pdfConfig, empresa: e.target.value})}
-                  placeholder="NICMAT S.R.L."
-                  className="h-9"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <Label className="text-sm">Título del PDF</Label>
-                <Input 
-                  value={pdfConfig.titulo} 
-                  onChange={(e) => setPdfConfig({...pdfConfig, titulo: e.target.value})}
-                  placeholder="INVENTARIO DE BATERÍAS"
-                  className="h-9"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <Label className="text-sm">Subtítulo</Label>
-                <Input 
-                  value={pdfConfig.subtitulo} 
-                  onChange={(e) => setPdfConfig({...pdfConfig, subtitulo: e.target.value})}
-                  placeholder="Listado completo de productos"
-                  className="h-9"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <Label className="text-sm">Color Principal</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    type="color"
-                    value={pdfConfig.colorPrincipal} 
-                    onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
-                    className="w-12 h-9 p-1 cursor-pointer"
-                  />
-                  <Input 
-                    value={pdfConfig.colorPrincipal} 
-                    onChange={(e) => setPdfConfig({...pdfConfig, colorPrincipal: e.target.value})}
-                    placeholder="#1a5f7a"
-                    className="flex-1 h-9"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between py-1">
-                <Label htmlFor="mostrar-logo" className="text-sm">Mostrar Logo/Iniciales</Label>
-                <Switch 
-                  id="mostrar-logo"
-                  checked={pdfConfig.mostrarLogo} 
-                  onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarLogo: checked})}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between py-1">
-                <Label htmlFor="mostrar-fecha" className="text-sm">Mostrar Fecha</Label>
-                <Switch 
-                  id="mostrar-fecha"
-                  checked={pdfConfig.mostrarFecha} 
-                  onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarFecha: checked})}
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="columnas" className="space-y-3 mt-4">
-              <p className="text-xs text-muted-foreground">
-                Selecciona qué columnas mostrar en el PDF.
-              </p>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 rounded border">
-                  <div>
-                    <Label className="text-sm">Costo Unitario</Label>
-                    <p className="text-xs text-muted-foreground">Columna de costo por unidad</p>
-                  </div>
-                  <Switch 
-                    checked={pdfConfig.mostrarCosto} 
-                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarCosto: checked})}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between p-2 rounded border">
-                  <div>
-                    <Label className="text-sm">Precio de Venta</Label>
-                    <p className="text-xs text-muted-foreground">Columna de precio de venta</p>
-                  </div>
-                  <Switch 
-                    checked={pdfConfig.mostrarPrecioVenta} 
-                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarPrecioVenta: checked})}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between p-2 rounded border">
-                  <div>
-                    <Label className="text-sm">Columnas de Totales</Label>
-                    <p className="text-xs text-muted-foreground">Costo total y venta total por producto</p>
-                  </div>
-                  <Switch 
-                    checked={pdfConfig.mostrarTotales} 
-                    onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarTotales: checked})}
-                  />
-                </div>
-              </div>
-              
-              <div className="p-2 bg-muted rounded-lg">
-                <p className="text-xs font-medium mb-1">Columnas:</p>
-                <div className="flex flex-wrap gap-1 text-xs">
-                  <Badge variant="secondary" className="text-xs">Marca</Badge>
-                  <Badge variant="secondary" className="text-xs">Amperaje</Badge>
-                  <Badge variant="secondary" className="text-xs">Cantidad</Badge>
-                  {pdfConfig.mostrarCosto && <Badge className="text-xs">Costo</Badge>}
-                  {pdfConfig.mostrarPrecioVenta && <Badge className="text-xs">Precio</Badge>}
-                  {pdfConfig.mostrarTotales && pdfConfig.mostrarCosto && <Badge variant="outline" className="text-xs">Total Costo</Badge>}
-                  {pdfConfig.mostrarTotales && pdfConfig.mostrarPrecioVenta && <Badge variant="outline" className="text-xs">Total Venta</Badge>}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setPdfConfigOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={savePdfConfig} disabled={pdfConfigLoading}>
-              {pdfConfigLoading ? 'Guardando...' : 'Guardar Configuración'}
             </Button>
           </DialogFooter>
         </DialogContent>
