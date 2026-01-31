@@ -142,17 +142,28 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   };
 
   const hasAccess = (item: NavItem) => {
+    // Si no hay usuario, no mostrar nada con restricciones
+    if (!user) {
+      return !item.roles && !item.permission;
+    }
+    
     // Verificar rol
-    if (item.roles && (!user || !item.roles.includes(user.role))) {
+    if (item.roles && !item.roles.includes(user.role)) {
       return false;
     }
     
     // Verificar permiso de módulo
-    if (item.permission && user?.permissions) {
-      return user.permissions[item.permission] === true;
+    if (item.permission) {
+      // Si es admin, tiene acceso a todo
+      if (user.role === USER_ROLES.ADMIN) {
+        return true;
+      }
+      // Si no tiene permisos definidos o el permiso es false, denegar
+      if (!user.permissions || user.permissions[item.permission] !== true) {
+        return false;
+      }
     }
     
-    // Si no tiene restricción de permiso, permitir acceso
     return true;
   };
 
@@ -176,13 +187,18 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
       {/* Navegación */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4">
-        {navigation.map((group, groupIndex) => (
+        {navigation.map((group, groupIndex) => {
+          const visibleItems = group.items.filter(hasAccess);
+          // No mostrar grupos vacíos
+          if (visibleItems.length === 0) return null;
+          
+          return (
           <div key={group.title} className={cn(groupIndex > 0 && 'mt-6')}>
             <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               {group.title}
             </h3>
             <ul className="space-y-1">
-              {group.items.filter(hasAccess).map((item) => {
+              {visibleItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = isActiveLink(item.href);
                 const showStockAlert = item.href === ROUTES.INVENTORY && stockBajoCount > 0;
@@ -212,7 +228,8 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer del sidebar */}
