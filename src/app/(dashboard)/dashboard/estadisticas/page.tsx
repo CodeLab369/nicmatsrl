@@ -572,8 +572,8 @@ export default function EstadisticasPage() {
                             </td>
                             <td className="py-3 text-center">
                               <div>
-                                <Badge variant={tienda.stock_actual > 0 ? 'secondary' : 'outline'}>
-                                  {tienda.stock_actual} u.
+                                <Badge variant={(tienda.stock_actual ?? 0) > 0 ? 'secondary' : 'outline'}>
+                                  {tienda.stock_actual ?? 0} u.
                                 </Badge>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   {formatCurrency(tienda.valor_inventario ?? 0)}
