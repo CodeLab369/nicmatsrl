@@ -82,7 +82,9 @@ export default function InventarioPage() {
     mostrarFecha: true,
     mostrarLogo: true,
     itemsPorPagina: 25,
+    logo: null as string | null,
   });
+  const logoInputRef = useRef<HTMLInputElement>(null);
   
   // Import state
   const [importData, setImportData] = useState<any[]>([]);
@@ -139,6 +141,34 @@ export default function InventarioPage() {
     } finally {
       setPdfConfigLoading(false);
     }
+  };
+
+  // Manejar subida de logo
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 500 * 1024) {
+      toast({ title: 'Error', description: 'El logo debe ser menor a 500KB', variant: 'destructive' });
+      return;
+    }
+    
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Error', description: 'Solo se permiten imágenes', variant: 'destructive' });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPdfConfig(prev => ({ ...prev, logo: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remover logo
+  const handleRemoveLogo = () => {
+    setPdfConfig(prev => ({ ...prev, logo: null }));
+    if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
   // Cargar marcas disponibles
@@ -622,6 +652,11 @@ export default function InventarioPage() {
       if (cfg.mostrarTotales && cfg.mostrarCosto) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Costo Total</th>';
       if (cfg.mostrarTotales && cfg.mostrarPrecioVenta) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Venta Total</th>';
       
+      // Logo HTML
+      const logoHTML = cfg.logo 
+        ? `<img src="${cfg.logo}" alt="Logo" style="width: 40px; height: 40px; object-fit: contain; border-radius: 8px;">`
+        : `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>`;
+      
       // Generar filas
       const filas = allItems.map((item, i) => `
         <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
@@ -707,7 +742,7 @@ export default function InventarioPage() {
   <!-- Header -->
   <div class="header">
     <div class="header-left">
-      ${cfg.mostrarLogo ? `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>` : ''}
+      ${cfg.mostrarLogo ? logoHTML : ''}
       <div>
         <div class="company-name">${cfg.empresa}</div>
         <div class="doc-title">${cfg.titulo}</div>
@@ -1495,6 +1530,55 @@ export default function InventarioPage() {
             </TabsList>
             
             <TabsContent value="general" className="space-y-4 mt-4">
+              {/* Logo */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Upload className="h-4 w-4" /> Logo de la Empresa
+                </Label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted">
+                    {pdfConfig.logo ? (
+                      <img src={pdfConfig.logo} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="text-2xl font-bold text-muted-foreground">
+                        {pdfConfig.empresa?.substring(0, 2).toUpperCase() || 'NM'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      ref={logoInputRef}
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      <Upload className="mr-2 h-3 w-3" />
+                      Subir Logo
+                    </Button>
+                    {pdfConfig.logo && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveLogo}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-3 w-3" />
+                        Quitar
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">PNG, JPG o SVG. Máx. 500KB</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label>Nombre de Empresa</Label>
                 <Input 
