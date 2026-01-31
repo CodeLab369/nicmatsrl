@@ -563,11 +563,11 @@ export default function EstadisticasPage() {
                               <span className="font-medium">{tienda.total_unidades}</span>
                             </td>
                             <td className="py-3 text-right font-medium">
-                              {formatCurrency(tienda.total_valor)}
+                              {formatCurrency(tienda.total_valor ?? 0)}
                             </td>
                             <td className="py-3 text-right">
-                              <span className={tienda.total_ganancia >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                {formatCurrency(tienda.total_ganancia)}
+                              <span className={(tienda.total_ganancia ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {formatCurrency(tienda.total_ganancia ?? 0)}
                               </span>
                             </td>
                             <td className="py-3 text-center">
@@ -576,7 +576,7 @@ export default function EstadisticasPage() {
                                   {tienda.stock_actual} u.
                                 </Badge>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                  {formatCurrency(tienda.valor_inventario)}
+                                  {formatCurrency(tienda.valor_inventario ?? 0)}
                                 </p>
                               </div>
                             </td>
