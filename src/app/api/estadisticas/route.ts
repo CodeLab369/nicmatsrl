@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
       return await getEstadisticasVentas(startDate, endDate);
     } else if (tipo === 'tiendas') {
       return await getEstadisticasTiendas(startDate, endDate);
+    } else if (tipo === 'inventario') {
+      return await getEstadisticasInventario();
     } else {
       return NextResponse.json({ error: 'Tipo de estadística no válido' }, { status: 400 });
     }
@@ -310,5 +312,107 @@ async function getEstadisticasTiendas(startDate: string | null, endDate: string 
     productos: productosArray.slice(0, 50),
     marcas: marcasArray,
     ranking: tiendasRanking,
+  });
+}
+
+// Estadísticas de inventario general
+async function getEstadisticasInventario() {
+  // Obtener inventario central
+  const { data: inventario } = await supabase
+    .from('inventory')
+    .select('marca, amperaje, cantidad, costo, precio_venta');
+
+  // Obtener inventario de tiendas
+  const { data: invTiendas } = await supabase
+    .from('tienda_inventario')
+    .select('tienda_id, marca, amperaje, cantidad, precio_venta');
+
+  // Obtener tiendas
+  const { data: tiendas } = await supabase
+    .from('tiendas')
+    .select('id, nombre, tipo');
+
+  // Estadísticas por marca (inventario central)
+  const marcasMap = new Map<string, {
+    marca: string;
+    cantidad_central: number;
+    cantidad_tiendas: number;
+    cantidad_total: number;
+    valor_costo: number;
+    valor_venta: number;
+    productos_distintos: number;
+  }>();
+
+  inventario?.forEach(item => {
+    const existing = marcasMap.get(item.marca) || {
+      marca: item.marca,
+      cantidad_central: 0,
+      cantidad_tiendas: 0,
+      cantidad_total: 0,
+      valor_costo: 0,
+      valor_venta: 0,
+      productos_distintos: 0
+    };
+    
+    existing.cantidad_central += item.cantidad;
+    existing.cantidad_total += item.cantidad;
+    existing.valor_costo += item.cantidad * (item.costo || 0);
+    existing.valor_venta += item.cantidad * (item.precio_venta || 0);
+    existing.productos_distintos += 1;
+    
+    marcasMap.set(item.marca, existing);
+  });
+
+  // Agregar cantidades de tiendas
+  invTiendas?.forEach(item => {
+    const existing = marcasMap.get(item.marca);
+    if (existing) {
+      existing.cantidad_tiendas += item.cantidad;
+      existing.cantidad_total += item.cantidad;
+    }
+  });
+
+  const marcasArray = Array.from(marcasMap.values())
+    .sort((a, b) => b.cantidad_total - a.cantidad_total);
+
+  // Productos con bajo stock
+  const stockBajo = inventario?.filter(item => item.cantidad <= 5)
+    .sort((a, b) => a.cantidad - b.cantidad)
+    .slice(0, 20) || [];
+
+  // Productos sin stock
+  const sinStock = inventario?.filter(item => item.cantidad === 0) || [];
+
+  // Distribución por tienda
+  const distribucionTiendas = tiendas?.map(tienda => {
+    const items = invTiendas?.filter(i => i.tienda_id === tienda.id) || [];
+    return {
+      id: tienda.id,
+      nombre: tienda.nombre,
+      tipo: tienda.tipo,
+      total_productos: items.length,
+      total_unidades: items.reduce((sum, i) => sum + i.cantidad, 0),
+      valor_inventario: items.reduce((sum, i) => sum + (i.cantidad * i.precio_venta), 0),
+    };
+  }).sort((a, b) => b.total_unidades - a.total_unidades) || [];
+
+  // Totales
+  const totales = {
+    total_productos_central: inventario?.length || 0,
+    total_unidades_central: inventario?.reduce((sum, i) => sum + i.cantidad, 0) || 0,
+    total_unidades_tiendas: invTiendas?.reduce((sum, i) => sum + i.cantidad, 0) || 0,
+    valor_costo_total: inventario?.reduce((sum, i) => sum + (i.cantidad * (i.costo || 0)), 0) || 0,
+    valor_venta_total: inventario?.reduce((sum, i) => sum + (i.cantidad * (i.precio_venta || 0)), 0) || 0,
+    productos_sin_stock: sinStock.length,
+    productos_stock_bajo: stockBajo.length,
+  };
+
+  return NextResponse.json({
+    tipo: 'inventario',
+    totales,
+    marcas: marcasArray,
+    stockBajo,
+    sinStock,
+    distribucionTiendas,
   });
 }

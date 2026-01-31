@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart3, TrendingUp, Package, Store, ShoppingCart, DollarSign,
-  Calendar, RefreshCw, ChevronUp, ChevronDown, Minus, Award, Target, Filter
+  Calendar, RefreshCw, ChevronUp, ChevronDown, Minus, Award, Target, Filter, AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -27,8 +27,12 @@ interface ProductoStats {
 
 interface MarcaStats {
   marca: string;
-  cantidad_vendida: number;
-  valor_venta: number;
+  cantidad_vendida?: number;
+  cantidad_central?: number;
+  cantidad_tiendas?: number;
+  cantidad_total?: number;
+  valor_venta?: number;
+  valor_costo?: number;
   productos_distintos: number;
 }
 
@@ -36,32 +40,51 @@ interface TiendaRanking {
   id: string;
   nombre: string;
   tipo: string;
-  ciudad: string;
-  total_ventas: number;
+  ciudad?: string;
+  total_ventas?: number;
   total_unidades: number;
-  total_valor: number;
-  total_ganancia: number;
-  stock_actual: number;
-  valor_inventario: number;
+  total_valor?: number;
+  total_ganancia?: number;
+  stock_actual?: number;
+  valor_inventario?: number;
+  total_productos?: number;
+}
+
+interface StockBajoItem {
+  marca: string;
+  amperaje: string;
+  cantidad: number;
+  costo?: number;
+  precio_venta: number;
 }
 
 interface EstadisticasData {
   tipo: string;
-  periodo: { desde: string | null; hasta: string | null };
+  periodo?: { desde: string | null; hasta: string | null };
   totales: {
-    total_ventas: number;
-    total_unidades: number;
+    total_ventas?: number;
+    total_unidades?: number;
+    total_unidades_central?: number;
+    total_unidades_tiendas?: number;
+    total_productos_central?: number;
     total_costo?: number;
-    total_valor: number;
-    total_ganancia: number;
+    total_valor?: number;
+    total_ganancia?: number;
     tiendas_activas?: number;
+    valor_costo_total?: number;
+    valor_venta_total?: number;
+    productos_sin_stock?: number;
+    productos_stock_bajo?: number;
   };
-  productos: ProductoStats[];
+  productos?: ProductoStats[];
   marcas: MarcaStats[];
   ranking?: TiendaRanking[];
+  stockBajo?: StockBajoItem[];
+  sinStock?: StockBajoItem[];
+  distribucionTiendas?: TiendaRanking[];
 }
 
-type TipoEstadistica = 'ventas' | 'tiendas';
+type TipoEstadistica = 'ventas' | 'tiendas' | 'inventario';
 type Periodo = 'semana' | 'mes' | 'trimestre' | 'anio' | 'todo' | 'custom';
 
 export default function EstadisticasPage() {
@@ -150,7 +173,7 @@ export default function EstadisticasPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs">Tipo</Label>
                 <Select value={tipoEstadistica} onValueChange={(v) => setTipoEstadistica(v as TipoEstadistica)}>
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="w-[180px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -163,14 +186,22 @@ export default function EstadisticasPage() {
                     <SelectItem value="tiendas">
                       <span className="flex items-center gap-2">
                         <Store className="h-4 w-4" />
-                        Tiendas
+                        Ventas Tiendas
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="inventario">
+                      <span className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Inventario
                       </span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Período */}
+              {/* Período - solo para ventas y tiendas */}
+              {tipoEstadistica !== 'inventario' && (
+              <>
               <div className="space-y-1.5">
                 <Label className="text-xs">Período</Label>
                 <Select value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
@@ -219,6 +250,8 @@ export default function EstadisticasPage() {
                   </Button>
                 </>
               )}
+              </>
+              )}
 
               <div className="flex-1" />
 
@@ -237,14 +270,15 @@ export default function EstadisticasPage() {
         </div>
       ) : data ? (
         <>
-          {/* Cards de resumen */}
+          {/* Cards de resumen - Ventas/Tiendas */}
+          {tipoEstadistica !== 'inventario' && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Ventas Totales</p>
-                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_ventas}</p>
+                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_ventas || 0}</p>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
                     <ShoppingCart className="h-5 w-5 text-blue-600" />
@@ -258,7 +292,7 @@ export default function EstadisticasPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Unidades Vendidas</p>
-                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_unidades}</p>
+                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_unidades || 0}</p>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
                     <Package className="h-5 w-5 text-green-600" />
@@ -272,7 +306,7 @@ export default function EstadisticasPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Valor Total</p>
-                    <p className="text-lg sm:text-xl font-bold">{formatCurrency(data.totales.total_valor)}</p>
+                    <p className="text-lg sm:text-xl font-bold">{formatCurrency(data.totales.total_valor || 0)}</p>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
                     <DollarSign className="h-5 w-5 text-amber-600" />
@@ -286,7 +320,7 @@ export default function EstadisticasPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">Ganancia Total</p>
-                    <p className="text-lg sm:text-xl font-bold text-green-600">{formatCurrency(data.totales.total_ganancia)}</p>
+                    <p className="text-lg sm:text-xl font-bold text-green-600">{formatCurrency(data.totales.total_ganancia || 0)}</p>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
                     <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -295,8 +329,71 @@ export default function EstadisticasPage() {
               </CardContent>
             </Card>
           </div>
+          )}
+
+          {/* Cards de resumen - Inventario */}
+          {tipoEstadistica === 'inventario' && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stock Central</p>
+                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_unidades_central || 0}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">En Tiendas</p>
+                    <p className="text-xl sm:text-2xl font-bold">{data.totales.total_unidades_tiendas || 0}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <Store className="h-5 w-5 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Valor en Costo</p>
+                    <p className="text-lg sm:text-xl font-bold">{formatCurrency(data.totales.valor_costo_total || 0)}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-amber-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Valor en Venta</p>
+                    <p className="text-lg sm:text-xl font-bold text-green-600">{formatCurrency(data.totales.valor_venta_total || 0)}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          )}
 
           {/* Contenido principal en grid */}
+          {tipoEstadistica !== 'inventario' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Ranking de Marcas */}
             <Card>
@@ -324,20 +421,20 @@ export default function EstadisticasPage() {
                           <div className="flex items-center justify-between">
                             <span className="font-medium truncate">{marca.marca}</span>
                             <span className="text-sm text-muted-foreground ml-2">
-                              {marca.cantidad_vendida} u.
+                              {marca.cantidad_vendida || 0} u.
                             </span>
                           </div>
                           <div className="h-2 bg-muted rounded-full mt-1 overflow-hidden">
                             <div 
                               className="h-full bg-primary rounded-full transition-all"
                               style={{ 
-                                width: `${(marca.cantidad_vendida / data.marcas[0].cantidad_vendida) * 100}%` 
+                                width: `${((marca.cantidad_vendida || 0) / (data.marcas[0].cantidad_vendida || 1)) * 100}%` 
                               }}
                             />
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground mt-1">
                             <span>{marca.productos_distintos} productos</span>
-                            <span>{formatCurrency(marca.valor_venta)}</span>
+                            <span>{formatCurrency(marca.valor_venta || 0)}</span>
                           </div>
                         </div>
                       </div>
@@ -375,7 +472,7 @@ export default function EstadisticasPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.productos.slice(0, 15).map((prod, index) => (
+                        {(data.productos || []).slice(0, 15).map((prod, index) => (
                           <tr key={`${prod.marca}-${prod.amperaje}`} className="border-b hover:bg-muted/50">
                             <td className="py-2">
                               <span className="text-muted-foreground">{index + 1}</span>
@@ -406,6 +503,7 @@ export default function EstadisticasPage() {
               </CardContent>
             </Card>
           </div>
+          )}
 
           {/* Ranking de Tiendas (solo si es tipo tiendas) */}
           {tipoEstadistica === 'tiendas' && data.ranking && (
@@ -490,6 +588,168 @@ export default function EstadisticasPage() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Estadísticas de Inventario */}
+          {tipoEstadistica === 'inventario' && (
+          <>
+            {/* Alertas de stock */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card className="border-amber-500/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2 text-amber-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    Stock Bajo ({data.totales.productos_stock_bajo || 0})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(data.stockBajo || []).length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">Sin productos con stock bajo</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {(data.stockBajo || []).slice(0, 10).map((item) => (
+                        <div key={`${item.marca}-${item.amperaje}`} className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-950/30 rounded">
+                          <div>
+                            <span className="font-medium">{item.marca}</span>
+                            <Badge variant="secondary" className="ml-2 text-xs">{item.amperaje}</Badge>
+                          </div>
+                          <Badge variant="destructive">{item.cantidad} u.</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-500/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2 text-red-600">
+                    <Package className="h-5 w-5" />
+                    Sin Stock ({data.totales.productos_sin_stock || 0})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(data.sinStock || []).length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">Todos los productos tienen stock</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {(data.sinStock || []).slice(0, 10).map((item) => (
+                        <div key={`${item.marca}-${item.amperaje}`} className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-950/30 rounded">
+                          <div>
+                            <span className="font-medium">{item.marca}</span>
+                            <Badge variant="secondary" className="ml-2 text-xs">{item.amperaje}</Badge>
+                          </div>
+                          <span className="text-red-600 font-medium text-sm">Agotado</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Marcas por stock */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Award className="h-5 w-5 text-amber-500" />
+                    Stock por Marca
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {data.marcas.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <p>Sin datos de inventario</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.marcas.slice(0, 10).map((marca, index) => (
+                        <div key={marca.marca} className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-6 flex justify-center">
+                            {getMedalla(index)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium truncate">{marca.marca}</span>
+                              <span className="text-sm text-muted-foreground ml-2">
+                                {marca.cantidad_total || 0} u.
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full mt-1 overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full transition-all"
+                                style={{ 
+                                  width: `${((marca.cantidad_total || 0) / (data.marcas[0].cantidad_total || 1)) * 100}%` 
+                                }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <span>Central: {marca.cantidad_central || 0} | Tiendas: {marca.cantidad_tiendas || 0}</span>
+                              <span>{formatCurrency(marca.valor_venta || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Distribución por tienda */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Store className="h-5 w-5 text-purple-500" />
+                    Inventario por Tienda
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(data.distribucionTiendas || []).length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Store className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <p>Sin tiendas registradas</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 font-medium">Tienda</th>
+                            <th className="text-center py-2 font-medium">Productos</th>
+                            <th className="text-center py-2 font-medium">Unidades</th>
+                            <th className="text-right py-2 font-medium">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(data.distribucionTiendas || []).map((tienda) => (
+                            <tr key={tienda.id} className="border-b hover:bg-muted/50">
+                              <td className="py-2">
+                                <div>
+                                  <span className="font-medium">{tienda.nombre}</span>
+                                  <Badge variant={tienda.tipo === 'casa_matriz' ? 'default' : 'secondary'} className="ml-2 text-xs">
+                                    {tienda.tipo === 'casa_matriz' ? 'Matriz' : 'Sucursal'}
+                                  </Badge>
+                                </div>
+                              </td>
+                              <td className="py-2 text-center">{tienda.total_productos}</td>
+                              <td className="py-2 text-center">
+                                <Badge variant="outline">{tienda.total_unidades}</Badge>
+                              </td>
+                              <td className="py-2 text-right font-medium">
+                                {formatCurrency(tienda.valor_inventario || 0)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
           )}
 
           {/* Detalle de costo/ganancia para ventas directas */}
