@@ -342,7 +342,7 @@ export default function ConfiguracionPage() {
               <Separator />
 
               {/* Contacto */}
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1"><Phone className="h-3 w-3" /> Teléfono Principal</Label>
                   <Input
@@ -367,16 +367,15 @@ export default function ConfiguracionPage() {
                     placeholder="+591 70000002"
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
-                <Input
-                  type="email"
-                  value={empresaConfig.email}
-                  onChange={(e) => setEmpresaConfig(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="contacto@empresa.com"
-                />
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
+                  <Input
+                    type="email"
+                    value={empresaConfig.email}
+                    onChange={(e) => setEmpresaConfig(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="contacto@empresa.com"
+                  />
+                </div>
               </div>
 
               <Separator />
