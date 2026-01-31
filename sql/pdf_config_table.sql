@@ -10,9 +10,11 @@ CREATE TABLE IF NOT EXISTS pdf_config (
 -- Habilitar RLS
 ALTER TABLE pdf_config ENABLE ROW LEVEL SECURITY;
 
--- Política para permitir todo a usuarios autenticados
-CREATE POLICY "Permitir todo a usuarios" ON pdf_config
-  FOR ALL USING (true) WITH CHECK (true);
+-- Política solo para usuarios autenticados
+CREATE POLICY "Solo usuarios autenticados" ON pdf_config
+  FOR ALL 
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
 
 -- Índice para búsquedas rápidas por módulo
 CREATE INDEX IF NOT EXISTS idx_pdf_config_modulo ON pdf_config(modulo);

@@ -105,20 +105,22 @@ export default function InventarioPage() {
   const { toast } = useToast();
   
   // Cargar configuración PDF desde la nube
-  useEffect(() => {
-    const loadPdfConfig = async () => {
-      try {
-        const response = await fetch('/api/pdf-config?modulo=inventario');
-        const data = await response.json();
-        if (data.config) {
-          setPdfConfig(prev => ({ ...prev, ...data.config }));
-        }
-      } catch (error) {
-        console.error('Error cargando config PDF:', error);
+  const loadPdfConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/pdf-config?modulo=inventario');
+      const data = await response.json();
+      if (data.config) {
+        setPdfConfig(prev => ({ ...prev, ...data.config }));
       }
-    };
-    loadPdfConfig();
+    } catch (error) {
+      console.error('Error cargando config PDF:', error);
+    }
   }, []);
+  
+  // Cargar config al inicio
+  useEffect(() => {
+    loadPdfConfig();
+  }, [loadPdfConfig]);
   
   // Guardar configuración PDF en la nube
   const savePdfConfig = async () => {
@@ -233,6 +235,11 @@ export default function InventarioPage() {
     fetchInventoryRef.current();
     fetchMarcasRef.current();
   }, 500);
+  
+  // Suscripción Realtime para configuración de PDF
+  useTableSubscription('pdf_config', () => {
+    loadPdfConfig();
+  });
 
   // Resetear página al cambiar filtros
   useEffect(() => {
