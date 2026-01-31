@@ -5,7 +5,7 @@ import {
   Store, Plus, Search, Package, ChevronLeft, ChevronRight,
   Eye, Pencil, Trash2, RefreshCw, Building2, MapPin, User,
   Send, ArrowRight, CheckCircle, X, Filter, ChevronDown, Undo2, Download,
-  Upload, FileSpreadsheet, Clock, Check, AlertCircle, Printer, Settings,
+  Upload, FileSpreadsheet, Clock, Check, AlertCircle, Printer,
   Copy, Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -215,11 +215,8 @@ export default function TiendasPage() {
   }>>([]);
   const [newSaldoItem, setNewSaldoItem] = useState({ marca: '', amperaje: '', cantidad: 1, precio_venta: 0 });
   
-  // Configuración de empresa para PDF
+  // Configuración de empresa para PDF (solo lectura)
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(defaultEmpresaConfig);
-  const [configDialogOpen, setConfigDialogOpen] = useState(false);
-  const [configForm, setConfigForm] = useState<EmpresaConfig>(defaultEmpresaConfig);
-  const [isSavingConfig, setIsSavingConfig] = useState(false);
   
   // PDF después de confirmar envío
   const [printConfirmDialogOpen, setPrintConfirmDialogOpen] = useState(false);
@@ -352,7 +349,6 @@ export default function TiendasPage() {
       const data = await response.json();
       if (data.config) {
         setEmpresaConfig(data.config);
-        setConfigForm(data.config);
       }
     } catch (error) {
       console.error('Error fetching empresa config:', error);
@@ -904,27 +900,7 @@ export default function TiendasPage() {
     }
   };
 
-  // Guardar configuración de empresa
-  const handleSaveConfig = async () => {
-    try {
-      setIsSavingConfig(true);
-      const response = await fetch('/api/empresa-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(configForm)
-      });
 
-      if (!response.ok) throw new Error();
-
-      setEmpresaConfig(configForm);
-      setConfigDialogOpen(false);
-      toast({ title: 'Configuración guardada', variant: 'success' });
-    } catch {
-      toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' });
-    } finally {
-      setIsSavingConfig(false);
-    }
-  };
 
   // Imprimir/PDF de envío
   const handlePrintEnvio = (envio: TiendaEnvio, items: EnvioItem[], tienda: Tienda) => {
@@ -2539,10 +2515,6 @@ export default function TiendasPage() {
           <p className="text-muted-foreground">Gestiona tus tiendas y su inventario</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => { setConfigForm(empresaConfig); setConfigDialogOpen(true); }}>
-            <Settings className="mr-2 h-4 w-4" />
-            Configurar PDF
-          </Button>
           <Button onClick={() => { setShowForm(!showForm); if (showForm) handleCancelForm(); }}>
             {showForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
             {showForm ? 'Cancelar' : 'Nueva Tienda'}
@@ -3906,189 +3878,6 @@ export default function TiendasPage() {
                 )}
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Configuración de Empresa para PDF */}
-      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Configuración del PDF
-            </DialogTitle>
-            <DialogDescription>
-              Personaliza la información que aparece en los PDFs de envío
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Datos de la empresa */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Datos de la Empresa</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre de la Empresa *</Label>
-                  <Input
-                    value={configForm.nombre}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, nombre: e.target.value }))}
-                    placeholder="NICMAT S.R.L."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>NIT</Label>
-                  <Input
-                    value={configForm.nit || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, nit: e.target.value }))}
-                    placeholder="1234567890"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Dirección</Label>
-                  <Input
-                    value={configForm.direccion || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, direccion: e.target.value }))}
-                    placeholder="Av. Principal #123"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Ciudad</Label>
-                  <Input
-                    value={configForm.ciudad || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, ciudad: e.target.value }))}
-                    placeholder="La Paz, Bolivia"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={configForm.email || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="info@empresa.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Color Principal</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={configForm.color_principal || '#1a5f7a'}
-                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
-                      className="w-14 h-10 p-1 cursor-pointer"
-                    />
-                    <Input
-                      value={configForm.color_principal || '#1a5f7a'}
-                      onChange={(e) => setConfigForm(prev => ({ ...prev, color_principal: e.target.value }))}
-                      placeholder="#1a5f7a"
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Teléfonos */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Teléfonos de Contacto</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Teléfono Principal</Label>
-                  <Input
-                    value={configForm.telefono_principal || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_principal: e.target.value }))}
-                    placeholder="77012345"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono Secundario</Label>
-                  <Input
-                    value={configForm.telefono_secundario || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_secundario: e.target.value }))}
-                    placeholder="77567890"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono Adicional</Label>
-                  <Input
-                    value={configForm.telefono_adicional || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, telefono_adicional: e.target.value }))}
-                    placeholder="2-2123456"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Logo */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Logo de la Empresa</h4>
-              <div className="flex items-start gap-4">
-                <div className="w-20 h-20 border rounded-lg flex items-center justify-center overflow-hidden bg-muted">
-                  {configForm.logo ? (
-                    <img src={configForm.logo} alt="Logo" className="w-full h-full object-contain" />
-                  ) : (
-                    <Store className="h-8 w-8 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Label>URL del Logo o Base64</Label>
-                  <Input
-                    value={configForm.logo || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, logo: e.target.value }))}
-                    placeholder="https://... o data:image/png;base64,..."
-                  />
-                  <p className="text-xs text-muted-foreground">Pega una URL de imagen o el código base64 de tu logo</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Pie de página */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Pie de Página del PDF</h4>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre en Pie de Página</Label>
-                  <Input
-                    value={configForm.pie_empresa || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_empresa: e.target.value }))}
-                    placeholder="NICMAT S.R.L. - Tu mejor opción en baterías"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mensaje de Agradecimiento</Label>
-                  <Input
-                    value={configForm.pie_agradecimiento || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_agradecimiento: e.target.value }))}
-                    placeholder="¡Gracias por su confianza!"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Información de Contacto</Label>
-                  <Input
-                    value={configForm.pie_contacto || ''}
-                    onChange={(e) => setConfigForm(prev => ({ ...prev, pie_contacto: e.target.value }))}
-                    placeholder="Para consultas: 77012345 | info@empresa.com"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveConfig} disabled={isSavingConfig || !configForm.nombre.trim()}>
-              {isSavingConfig ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                'Guardar Configuración'
-              )}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
