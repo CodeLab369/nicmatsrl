@@ -175,12 +175,11 @@ export default function InventarioPage() {
     fetchInventory();
   }, [fetchInventory]);
 
-  // Suscripción a Realtime centralizada - actualización instantánea
-  // Usa refs para siempre tener la versión más reciente de las funciones
+  // Suscripción a Realtime - el hook ya tiene debounce integrado (500ms para inventory)
   useTableSubscription('inventory', () => {
     fetchInventoryRef.current();
     fetchMarcasRef.current();
-  });
+  }, 500);
 
   // Resetear página al cambiar filtros
   useEffect(() => {

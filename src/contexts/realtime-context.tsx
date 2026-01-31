@@ -113,10 +113,12 @@ export function useRealtimeContext() {
   return context;
 }
 
-// Hook simplificado para usar en las páginas - optimizado para actualizaciones instantáneas
-export function useTableSubscription(table: TableName, callback: Callback) {
+// Hook simplificado para usar en las páginas - con DEBOUNCE integrado
+// Esto evita múltiples peticiones cuando se eliminan/actualizan muchos registros
+export function useTableSubscription(table: TableName, callback: Callback, debounceMs = 300) {
   const { isConnected, subscribe } = useRealtimeContext();
   const callbackRef = useRef(callback);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Actualizar ref cuando cambie el callback (sin re-render)
   useEffect(() => {
@@ -125,15 +127,25 @@ export function useTableSubscription(table: TableName, callback: Callback) {
 
   useEffect(() => {
     const wrappedCallback = () => {
-      callbackRef.current();
+      // Cancelar timeout anterior
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      // Esperar antes de ejecutar (acumula cambios rápidos)
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current();
+      }, debounceMs);
     };
     
     const unsubscribe = subscribe(table, wrappedCallback);
     
     return () => {
       unsubscribe();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
-  }, [table, subscribe]);
+  }, [table, subscribe, debounceMs]);
 
   return isConnected;
 }
