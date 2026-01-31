@@ -1221,6 +1221,9 @@ export default function MovimientosPage() {
               <Plus className="h-5 w-5" />
               Agregar Gasto - {selectedTienda?.nombre}
             </DialogTitle>
+            <DialogDescription>
+              Registra un nuevo gasto para esta tienda
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
