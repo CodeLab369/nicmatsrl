@@ -70,6 +70,7 @@ export default function InventarioPage() {
   
   // PDF state
   const [pdfConfigOpen, setPdfConfigOpen] = useState(false);
+  const [pdfConfigLoading, setPdfConfigLoading] = useState(false);
   const [pdfConfig, setPdfConfig] = useState({
     titulo: 'INVENTARIO DE BATERÍAS',
     subtitulo: 'Listado completo de productos en stock',
@@ -80,7 +81,7 @@ export default function InventarioPage() {
     mostrarTotales: true,
     mostrarFecha: true,
     mostrarLogo: true,
-    logo: '',
+    itemsPorPagina: 25,
   });
   
   // Import state
@@ -103,19 +104,39 @@ export default function InventarioPage() {
   
   const { toast } = useToast();
   
-  // Cargar configuración PDF desde localStorage
+  // Cargar configuración PDF desde la nube
   useEffect(() => {
-    const savedConfig = localStorage.getItem('inventoryPdfConfig');
-    if (savedConfig) {
-      setPdfConfig(JSON.parse(savedConfig));
-    }
+    const loadPdfConfig = async () => {
+      try {
+        const response = await fetch('/api/pdf-config?modulo=inventario');
+        const data = await response.json();
+        if (data.config) {
+          setPdfConfig(prev => ({ ...prev, ...data.config }));
+        }
+      } catch (error) {
+        console.error('Error cargando config PDF:', error);
+      }
+    };
+    loadPdfConfig();
   }, []);
   
-  // Guardar configuración PDF
-  const savePdfConfig = () => {
-    localStorage.setItem('inventoryPdfConfig', JSON.stringify(pdfConfig));
-    toast({ title: 'Configuración guardada', description: 'La configuración del PDF se ha guardado' });
-    setPdfConfigOpen(false);
+  // Guardar configuración PDF en la nube
+  const savePdfConfig = async () => {
+    setPdfConfigLoading(true);
+    try {
+      const response = await fetch('/api/pdf-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modulo: 'inventario', config: pdfConfig }),
+      });
+      if (!response.ok) throw new Error();
+      toast({ title: 'Configuración guardada', description: 'La configuración se ha guardado en la nube' });
+      setPdfConfigOpen(false);
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' });
+    } finally {
+      setPdfConfigLoading(false);
+    }
   };
 
   // Cargar marcas disponibles
@@ -555,7 +576,7 @@ export default function InventarioPage() {
     setEditDialogOpen(true);
   };
 
-  // Generar PDF del inventario
+  // Generar PDF del inventario con paginación propia
   const generatePDF = async () => {
     try {
       // Obtener TODOS los productos (sin paginación)
@@ -570,12 +591,20 @@ export default function InventarioPage() {
 
       const cfg = pdfConfig;
       const fecha = new Date().toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+      const itemsPorPagina = cfg.itemsPorPagina || 25;
       
       // Calcular totales
       const totalProductos = allItems.length;
       const totalUnidades = allItems.reduce((acc, item) => acc + item.cantidad, 0);
       const totalCosto = allItems.reduce((acc, item) => acc + (item.cantidad * item.costo), 0);
       const totalVenta = allItems.reduce((acc, item) => acc + (item.cantidad * item.precio_venta), 0);
+      
+      // Dividir items en páginas
+      const paginas: InventoryItem[][] = [];
+      for (let i = 0; i < allItems.length; i += itemsPorPagina) {
+        paginas.push(allItems.slice(i, i + itemsPorPagina));
+      }
+      const totalPaginas = paginas.length;
       
       // Función para ajustar color
       const adjustColor = (color: string, amount: number): string => {
@@ -586,29 +615,81 @@ export default function InventarioPage() {
         return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
       };
       
-      // Generar filas de productos
-      const productosHTML = allItems.map((item, i) => `
-        <tr style="background-color: ${i % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef;">${item.marca}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef;">${item.amperaje}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: center; font-weight: 600;">
-            <span style="background: ${item.cantidad > 0 ? '#dcfce7' : '#fee2e2'}; color: ${item.cantidad > 0 ? '#166534' : '#991b1b'}; padding: 2px 8px; border-radius: 4px;">
+      // Columnas dinámicas
+      let columnas = '<th style="padding: 10px 8px; text-align: left; font-size: 9pt;">Marca</th><th style="padding: 10px 8px; text-align: left; font-size: 9pt;">Amperaje</th><th style="padding: 10px 8px; text-align: center; font-size: 9pt;">Cant.</th>';
+      if (cfg.mostrarCosto) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Costo Unit.</th>';
+      if (cfg.mostrarPrecioVenta) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Precio</th>';
+      if (cfg.mostrarTotales && cfg.mostrarCosto) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Costo Total</th>';
+      if (cfg.mostrarTotales && cfg.mostrarPrecioVenta) columnas += '<th style="padding: 10px 8px; text-align: right; font-size: 9pt;">Venta Total</th>';
+      
+      // Generar HTML para cada página
+      const generarFilas = (items: InventoryItem[], startIndex: number) => items.map((item, i) => `
+        <tr style="background-color: ${(startIndex + i) % 2 === 0 ? '#ffffff' : '#f8f9fa'};">
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; font-size: 9pt;">${item.marca}</td>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; font-size: 9pt;">${item.amperaje}</td>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: center; font-size: 9pt;">
+            <span style="background: ${item.cantidad > 0 ? '#dcfce7' : '#fee2e2'}; color: ${item.cantidad > 0 ? '#166534' : '#991b1b'}; padding: 2px 6px; border-radius: 3px; font-weight: 600;">
               ${item.cantidad}
             </span>
           </td>
-          ${cfg.mostrarCosto ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${item.costo.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
-          ${cfg.mostrarPrecioVenta ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right;">Bs. ${item.precio_venta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
-          ${cfg.mostrarTotales && cfg.mostrarCosto ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 500;">Bs. ${(item.cantidad * item.costo).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
-          ${cfg.mostrarTotales && cfg.mostrarPrecioVenta ? `<td style="padding: 8px 12px; border-bottom: 1px solid #e9ecef; text-align: right; font-weight: 500;">Bs. ${(item.cantidad * item.precio_venta).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarCosto ? `<td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: right; font-size: 9pt;">Bs. ${item.costo.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarPrecioVenta ? `<td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: right; font-size: 9pt;">Bs. ${item.precio_venta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarTotales && cfg.mostrarCosto ? `<td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: right; font-size: 9pt; font-weight: 500;">Bs. ${(item.cantidad * item.costo).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
+          ${cfg.mostrarTotales && cfg.mostrarPrecioVenta ? `<td style="padding: 6px 8px; border-bottom: 1px solid #e9ecef; text-align: right; font-size: 9pt; font-weight: 500;">Bs. ${(item.cantidad * item.precio_venta).toLocaleString('es-BO', { minimumFractionDigits: 2 })}</td>` : ''}
         </tr>
       `).join('');
       
-      // Columnas dinámicas
-      let columnas = '<th style="padding: 12px; text-align: left;">Marca</th><th style="padding: 12px; text-align: left;">Amperaje</th><th style="padding: 12px; text-align: center;">Cantidad</th>';
-      if (cfg.mostrarCosto) columnas += '<th style="padding: 12px; text-align: right;">Costo Unit.</th>';
-      if (cfg.mostrarPrecioVenta) columnas += '<th style="padding: 12px; text-align: right;">Precio Venta</th>';
-      if (cfg.mostrarTotales && cfg.mostrarCosto) columnas += '<th style="padding: 12px; text-align: right;">Costo Total</th>';
-      if (cfg.mostrarTotales && cfg.mostrarPrecioVenta) columnas += '<th style="padding: 12px; text-align: right;">Venta Total</th>';
+      // Generar páginas HTML
+      const paginasHTML = paginas.map((itemsPagina, indexPagina) => {
+        const numPagina = indexPagina + 1;
+        const startIndex = indexPagina * itemsPorPagina;
+        const esPrimeraPagina = numPagina === 1;
+        const esUltimaPagina = numPagina === totalPaginas;
+        
+        return `
+        <div class="page">
+          <!-- Header de página -->
+          <div class="page-header">
+            <div class="header-left">
+              ${cfg.mostrarLogo ? `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>` : ''}
+              <div>
+                <div class="company-name">${cfg.empresa}</div>
+                <div class="doc-title">${cfg.titulo}</div>
+              </div>
+            </div>
+            <div class="header-right">
+              ${cfg.mostrarFecha ? `<div class="fecha">${fecha}</div>` : ''}
+              <div class="page-num">Página ${numPagina} de ${totalPaginas}</div>
+            </div>
+          </div>
+          
+          ${esPrimeraPagina ? `
+          <!-- Resumen solo en primera página -->
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-value">${totalProductos}</div><div class="stat-label">Productos</div></div>
+            <div class="stat-item"><div class="stat-value">${totalUnidades.toLocaleString('es-BO')}</div><div class="stat-label">Unidades</div></div>
+            ${cfg.mostrarCosto ? `<div class="stat-item"><div class="stat-value">Bs. ${totalCosto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Costo Total</div></div>` : ''}
+            ${cfg.mostrarPrecioVenta ? `<div class="stat-item"><div class="stat-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Valor Venta</div></div>` : ''}
+          </div>
+          ` : ''}
+          
+          <!-- Tabla -->
+          <table>
+            <thead><tr>${columnas}</tr></thead>
+            <tbody>${generarFilas(itemsPagina, startIndex)}</tbody>
+          </table>
+          
+          <!-- Footer de página -->
+          <div class="page-footer">
+            <div class="footer-left">${cfg.empresa} | ${cfg.subtitulo}</div>
+            <div class="footer-center">
+              ${esUltimaPagina ? `<strong>TOTAL: ${totalProductos} productos | ${totalUnidades.toLocaleString('es-BO')} unidades</strong>` : `Items ${startIndex + 1} - ${startIndex + itemsPagina.length} de ${totalProductos}`}
+            </div>
+            <div class="footer-right">Página ${numPagina}/${totalPaginas}</div>
+          </div>
+        </div>
+        `;
+      }).join('');
       
       const html = `
 <!DOCTYPE html>
@@ -617,70 +698,87 @@ export default function InventarioPage() {
   <meta charset="UTF-8">
   <title>${cfg.titulo}</title>
   <style>
-    @page { size: letter; margin: 15mm; }
+    @page { 
+      size: letter; 
+      margin: 10mm 10mm 15mm 10mm;
+    }
     @media print {
       html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      .page { page-break-after: always; }
+      .page:last-child { page-break-after: avoid; }
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
-    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 3px solid ${cfg.colorPrincipal}; margin-bottom: 20px; }
-    .logo-section { display: flex; align-items: center; gap: 15px; }
-    .logo-placeholder { width: 60px; height: 60px; background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 40)} 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: bold; }
-    .company-name { font-size: 22pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
-    .date-section { text-align: right; }
-    .date-label { font-size: 9pt; color: #666; }
-    .date-value { font-size: 11pt; font-weight: 600; color: ${cfg.colorPrincipal}; }
-    .title-section { text-align: center; margin-bottom: 20px; }
-    .main-title { font-size: 18pt; font-weight: 700; color: ${cfg.colorPrincipal}; letter-spacing: 2px; }
-    .subtitle { font-size: 10pt; color: #666; margin-top: 5px; }
-    .stats-row { display: flex; justify-content: space-around; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 9pt; color: #333; line-height: 1.3; }
+    
+    .page {
+      position: relative;
+      min-height: 100vh;
+      padding-bottom: 40px;
+    }
+    
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 2px solid ${cfg.colorPrincipal};
+      margin-bottom: 15px;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo-placeholder {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 40)} 100%);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 16px; font-weight: bold;
+    }
+    .company-name { font-size: 14pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
+    .doc-title { font-size: 9pt; color: #666; }
+    .header-right { text-align: right; }
+    .fecha { font-size: 9pt; color: #666; }
+    .page-num { font-size: 10pt; font-weight: 600; color: ${cfg.colorPrincipal}; }
+    
+    .stats-row {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: linear-gradient(135deg, ${adjustColor(cfg.colorPrincipal, 80)} 0%, ${adjustColor(cfg.colorPrincipal, 100)} 100%);
+      border-radius: 6px;
+      border-left: 4px solid ${cfg.colorPrincipal};
+    }
     .stat-item { text-align: center; }
-    .stat-value { font-size: 16pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
-    .stat-label { font-size: 9pt; color: #666; }
+    .stat-value { font-size: 12pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
+    .stat-label { font-size: 8pt; color: #666; }
+    
     table { width: 100%; border-collapse: collapse; }
-    thead { background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 30)} 100%); color: white; }
-    thead th { padding: 12px; font-weight: 600; }
-    .footer { margin-top: 20px; padding-top: 15px; border-top: 2px solid #e9ecef; display: flex; justify-content: space-between; }
-    .footer-totals { display: flex; gap: 30px; }
-    .footer-total { text-align: right; }
-    .footer-total-label { font-size: 9pt; color: #666; }
-    .footer-total-value { font-size: 14pt; font-weight: 700; color: ${cfg.colorPrincipal}; }
-    .footer-generated { font-size: 8pt; color: #999; }
+    thead { 
+      background: linear-gradient(135deg, ${cfg.colorPrincipal} 0%, ${adjustColor(cfg.colorPrincipal, 30)} 100%); 
+      color: white;
+    }
+    thead th { font-weight: 600; }
+    tbody tr:hover { background-color: #f0f9ff !important; }
+    
+    .page-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid #e9ecef;
+      font-size: 8pt;
+      color: #666;
+    }
+    .footer-left { flex: 1; }
+    .footer-center { flex: 2; text-align: center; }
+    .footer-right { flex: 1; text-align: right; color: ${cfg.colorPrincipal}; font-weight: 600; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo-section">
-      ${cfg.mostrarLogo ? (cfg.logo ? `<img src="${cfg.logo}" style="width: 60px; height: 60px; object-fit: contain; border-radius: 10px;">` : `<div class="logo-placeholder">${cfg.empresa.substring(0, 2).toUpperCase()}</div>`) : ''}
-      <div class="company-name">${cfg.empresa}</div>
-    </div>
-    ${cfg.mostrarFecha ? `<div class="date-section"><div class="date-label">Fecha de generación</div><div class="date-value">${fecha}</div></div>` : ''}
-  </div>
-  
-  <div class="title-section">
-    <div class="main-title">${cfg.titulo}</div>
-    <div class="subtitle">${cfg.subtitulo}</div>
-  </div>
-  
-  <div class="stats-row">
-    <div class="stat-item"><div class="stat-value">${totalProductos}</div><div class="stat-label">Productos</div></div>
-    <div class="stat-item"><div class="stat-value">${totalUnidades.toLocaleString('es-BO')}</div><div class="stat-label">Unidades Totales</div></div>
-    ${cfg.mostrarCosto ? `<div class="stat-item"><div class="stat-value">Bs. ${totalCosto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Costo Total</div></div>` : ''}
-    ${cfg.mostrarPrecioVenta ? `<div class="stat-item"><div class="stat-value">Bs. ${totalVenta.toLocaleString('es-BO', { minimumFractionDigits: 2 })}</div><div class="stat-label">Valor de Venta</div></div>` : ''}
-  </div>
-  
-  <table>
-    <thead><tr>${columnas}</tr></thead>
-    <tbody>${productosHTML}</tbody>
-  </table>
-  
-  <div class="footer">
-    <div class="footer-generated">Generado el ${fecha} | ${cfg.empresa}</div>
-    <div class="footer-totals">
-      <div class="footer-total"><div class="footer-total-label">Total Productos</div><div class="footer-total-value">${totalProductos}</div></div>
-      <div class="footer-total"><div class="footer-total-label">Total Unidades</div><div class="footer-total-value">${totalUnidades.toLocaleString('es-BO')}</div></div>
-    </div>
-  </div>
+  ${paginasHTML}
 </body>
 </html>`;
 
@@ -1502,6 +1600,27 @@ export default function InventarioPage() {
                   onCheckedChange={(checked) => setPdfConfig({...pdfConfig, mostrarFecha: checked})}
                 />
               </div>
+              
+              <div className="space-y-2">
+                <Label>Productos por Página</Label>
+                <Select 
+                  value={pdfConfig.itemsPorPagina.toString()} 
+                  onValueChange={(v) => setPdfConfig({...pdfConfig, itemsPorPagina: parseInt(v)})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 productos</SelectItem>
+                    <SelectItem value="20">20 productos</SelectItem>
+                    <SelectItem value="25">25 productos</SelectItem>
+                    <SelectItem value="30">30 productos</SelectItem>
+                    <SelectItem value="35">35 productos</SelectItem>
+                    <SelectItem value="40">40 productos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Cantidad de productos por página en el PDF</p>
+              </div>
             </TabsContent>
             
             <TabsContent value="columnas" className="space-y-4 mt-4">
@@ -1563,8 +1682,8 @@ export default function InventarioPage() {
             <Button variant="outline" onClick={() => setPdfConfigOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={savePdfConfig}>
-              Guardar Configuración
+            <Button onClick={savePdfConfig} disabled={pdfConfigLoading}>
+              {pdfConfigLoading ? 'Guardando...' : 'Guardar Configuración'}
             </Button>
           </DialogFooter>
         </DialogContent>
