@@ -310,6 +310,21 @@ export default function MovimientosPage() {
     fetchResumen();
   }, [fetchResumen]);
 
+  // Actualizar selectedTienda cuando cambie el resumen
+  useEffect(() => {
+    if (selectedTienda && resumen?.tiendasDetalle) {
+      const tiendaActualizada = resumen.tiendasDetalle.find(t => t.id === selectedTienda.id);
+      if (tiendaActualizada && (
+        tiendaActualizada.ventas.total !== selectedTienda.ventas.total ||
+        tiendaActualizada.ventas.ganancia !== selectedTienda.ventas.ganancia ||
+        tiendaActualizada.ventas.cantidad !== selectedTienda.ventas.cantidad ||
+        tiendaActualizada.gastos.total !== selectedTienda.gastos.total
+      )) {
+        setSelectedTienda(tiendaActualizada);
+      }
+    }
+  }, [resumen, selectedTienda]);
+
   // Realtime: actualizar cuando cambien ventas, gastos o cotizaciones
   useTableSubscription('tienda_ventas', () => {
     fetchResumen();
@@ -449,9 +464,7 @@ export default function MovimientosPage() {
   };
 
   const handleSubmitGasto = async () => {
-    const categoriaFinal = gastoForm.categoria === 'Otro' ? gastoForm.categoriaOtro : gastoForm.categoria;
-    
-    if (!selectedTienda || !categoriaFinal || !gastoForm.monto) {
+    if (!selectedTienda || !gastoForm.categoria || !gastoForm.monto) {
       toast({ title: 'Error', description: 'Concepto y monto son requeridos', variant: 'destructive' });
       return;
     }
@@ -464,7 +477,7 @@ export default function MovimientosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tiendaId: selectedTienda.id,
-          categoria: categoriaFinal,
+          categoria: gastoForm.categoria,
           descripcion: gastoForm.descripcion,
           fecha: gastoForm.fecha,
           monto: parseFloat(gastoForm.monto)
@@ -1207,34 +1220,11 @@ export default function MovimientosPage() {
           <div className="space-y-4">
             <div>
               <Label>Concepto *</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              <Input
+                placeholder="Concepto"
                 value={gastoForm.categoria}
                 onChange={(e) => setGastoForm(prev => ({ ...prev, categoria: e.target.value }))}
-              >
-                <option value="">Seleccionar concepto...</option>
-                <option value="Servicios Básicos">Servicios Básicos</option>
-                <option value="Material de Escritorio">Material de Escritorio</option>
-                <option value="Material de Limpieza">Material de Limpieza</option>
-                <option value="Alquiler">Alquiler</option>
-                <option value="Transporte">Transporte</option>
-                <option value="Publicidad">Publicidad</option>
-                <option value="Mantenimiento">Mantenimiento</option>
-                <option value="Sueldos">Sueldos</option>
-                <option value="Impuestos">Impuestos</option>
-                {categoriasSugeridas.filter(c => !['Servicios Básicos', 'Material de Escritorio', 'Material de Limpieza', 'Alquiler', 'Transporte', 'Publicidad', 'Mantenimiento', 'Sueldos', 'Impuestos'].includes(c)).map((cat, i) => (
-                  <option key={i} value={cat}>{cat}</option>
-                ))}
-                <option value="Otro">Otro...</option>
-              </select>
-              {gastoForm.categoria === 'Otro' && (
-                <Input
-                  className="mt-2"
-                  placeholder="Especificar concepto..."
-                  value={gastoForm.categoriaOtro || ''}
-                  onChange={(e) => setGastoForm(prev => ({ ...prev, categoriaOtro: e.target.value }))}
-                />
-              )}
+              />
             </div>
 
             <div>
