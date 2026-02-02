@@ -145,12 +145,14 @@ export async function POST(request: NextRequest) {
     // Calcular totales
     let totalVenta = 0;
     let totalCosto = 0;
+    let totalUnidades = 0;
 
     const ventaItems = productos.map((p: any) => {
       const subtotal = p.cantidad * p.precio_venta;
       const costoTotal = p.cantidad * p.costo;
       totalVenta += subtotal;
       totalCosto += costoTotal;
+      totalUnidades += p.cantidad;
       return {
         inventario_id: p.inventarioId,
         marca: p.marca,
@@ -173,6 +175,7 @@ export async function POST(request: NextRequest) {
         fecha: fecha || new Date().toISOString().split('T')[0],
         total_venta: totalVenta,
         total_costo: totalCosto,
+        total_unidades: totalUnidades,
         ganancia,
         notas
       })

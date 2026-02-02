@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  TrendingUp, TrendingDown, DollarSign, Store, FileText, Calendar,
+  TrendingUp, TrendingDown, DollarSign, Store, Calendar,
   ChevronLeft, ChevronRight, Plus, Trash2, Eye, Package, RefreshCw,
   Receipt, Wallet, PiggyBank, BarChart3, Filter, Search, X, ShoppingCart
 } from 'lucide-react';
@@ -326,7 +326,7 @@ export default function MovimientosPage() {
     }
   }, [resumen, selectedTienda]);
 
-  // Realtime: actualizar cuando cambien ventas, gastos o cotizaciones
+  // Realtime: actualizar cuando cambien ventas, gastos o inventario de tiendas
   useTableSubscription('tienda_ventas', () => {
     fetchResumen();
     if (selectedTienda) fetchVentas();
@@ -335,7 +335,6 @@ export default function MovimientosPage() {
     fetchResumen();
     if (selectedTienda) fetchGastos();
   });
-  useTableSubscription('cotizaciones', fetchResumen);
   useTableSubscription('tienda_inventario', fetchResumen);
 
   useEffect(() => {
@@ -648,34 +647,8 @@ export default function MovimientosPage() {
             </Card>
           </div>
 
-          {/* Resumen por origen */}
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Cotizaciones */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Cotizaciones (Ventas Directas)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-2xl font-bold">{resumen?.cotizaciones.cantidad || 0}</p>
-                    <p className="text-xs text-muted-foreground">Ventas</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{formatCurrency(resumen?.cotizaciones.total || 0)}</p>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(resumen?.cotizaciones.ganancia || 0)}</p>
-                    <p className="text-xs text-muted-foreground">Ganancia</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
+          {/* Resumen de Tiendas */}
+          <div className="grid md:grid-cols-1 gap-4">
             {/* Tiendas (resumen) */}
             <Card>
               <CardHeader className="pb-2">
