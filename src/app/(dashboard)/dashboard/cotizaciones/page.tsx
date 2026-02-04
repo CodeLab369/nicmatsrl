@@ -138,6 +138,12 @@ export default function CotizacionesPage() {
   const [terminos, setTerminos] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Autocompletado de amperaje
+  const [amperajeBusqueda, setAmperajeBusqueda] = useState('');
+  const [showAmperajeSugerencias, setShowAmperajeSugerencias] = useState(false);
+  const amperajeInputRef = useRef<HTMLInputElement>(null);
+  const amperajeSugerenciasRef = useRef<HTMLDivElement>(null);
+  
   // Dialogs
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -249,6 +255,7 @@ export default function CotizacionesPage() {
         .map(i => i.amperaje);
       setAmperajesOptions(Array.from(new Set(amperajes)));
       setProductoActual(prev => ({ ...prev, amperaje: '', cantidad: '', precio: '' }));
+      setAmperajeBusqueda('');
       setStockDisponible(null);
     }
   }, [productoActual.marca, inventario]);
@@ -265,6 +272,34 @@ export default function CotizacionesPage() {
       }
     }
   }, [productoActual.marca, productoActual.amperaje, inventario]);
+
+  // Cerrar sugerencias de amperaje al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        amperajeInputRef.current && 
+        !amperajeInputRef.current.contains(event.target as Node) &&
+        amperajeSugerenciasRef.current &&
+        !amperajeSugerenciasRef.current.contains(event.target as Node)
+      ) {
+        setShowAmperajeSugerencias(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtrar amperajes según búsqueda
+  const amperajesFiltrados = amperajesOptions.filter(a => 
+    a.toLowerCase().includes(amperajeBusqueda.toLowerCase())
+  );
+
+  // Seleccionar un amperaje de las sugerencias
+  const seleccionarAmperaje = (amperaje: string) => {
+    setProductoActual(prev => ({ ...prev, amperaje }));
+    setAmperajeBusqueda(amperaje);
+    setShowAmperajeSugerencias(false);
+  };
 
   // Resetear página al cambiar filtros
   useEffect(() => {
@@ -310,6 +345,7 @@ export default function CotizacionesPage() {
     
     // Limpiar
     setProductoActual({ marca: '', amperaje: '', cantidad: '', precio: '' });
+    setAmperajeBusqueda('');
     setStockDisponible(null);
   };
 
@@ -328,6 +364,9 @@ export default function CotizacionesPage() {
   const handleLimpiar = () => {
     setClienteData({ nombre: '', telefono: '', email: '', direccion: '' });
     setProductosAgregados([]);
+    setProductoActual({ marca: '', amperaje: '', cantidad: '', precio: '' });
+    setAmperajeBusqueda('');
+    setStockDisponible(null);
     setDescuento('0');
     setVigenciaDias('7');
     setTerminos('');
@@ -1139,20 +1178,50 @@ export default function CotizacionesPage() {
                     </div>
                     <div>
                       <Label>Amperaje *</Label>
-                      <Select 
-                        value={productoActual.amperaje} 
-                        onValueChange={(v) => setProductoActual({ ...productoActual, amperaje: v })}
-                        disabled={!productoActual.marca}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {amperajesOptions.map((a) => (
-                            <SelectItem key={a} value={a}>{a}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Input
+                          ref={amperajeInputRef}
+                          placeholder={productoActual.marca ? "Buscar amperaje..." : "Seleccione marca primero"}
+                          value={amperajeBusqueda}
+                          onChange={(e) => {
+                            setAmperajeBusqueda(e.target.value);
+                            setShowAmperajeSugerencias(true);
+                            // Si borra el texto, limpiar selección
+                            if (!e.target.value) {
+                              setProductoActual(prev => ({ ...prev, amperaje: '', cantidad: '', precio: '' }));
+                              setStockDisponible(null);
+                            }
+                          }}
+                          onFocus={() => productoActual.marca && setShowAmperajeSugerencias(true)}
+                          disabled={!productoActual.marca}
+                          className="w-full"
+                        />
+                        {/* Dropdown de sugerencias */}
+                        {showAmperajeSugerencias && amperajesFiltrados.length > 0 && (
+                          <div 
+                            ref={amperajeSugerenciasRef}
+                            className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                          >
+                            {amperajesFiltrados.map((a) => (
+                              <button
+                                key={a}
+                                type="button"
+                                onClick={() => seleccionarAmperaje(a)}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors ${
+                                  productoActual.amperaje === a ? 'bg-accent text-accent-foreground' : ''
+                                }`}
+                              >
+                                {a}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {showAmperajeSugerencias && amperajeBusqueda && amperajesFiltrados.length === 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
+                            No se encontraron amperajes
+                          </div>
+                        )}
+                      </div>
                       {stockDisponible !== null && (
                         <p className="text-xs text-muted-foreground mt-1">Stock disponible: {stockDisponible}</p>
                       )}
