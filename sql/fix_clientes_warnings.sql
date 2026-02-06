@@ -3,12 +3,14 @@
 -- Ejecutar en Supabase SQL Editor
 -- ============================================
 
--- 1. Mover extensión pg_trgm al schema extensions
+-- 1. Eliminar índice que depende de pg_trgm primero
+DROP INDEX IF EXISTS idx_clientes_nombre;
+
+-- 2. Mover extensión pg_trgm al schema extensions
 DROP EXTENSION IF EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions;
 
--- 2. Recrear el índice GIN con el schema correcto
-DROP INDEX IF EXISTS idx_clientes_nombre;
+-- 3. Recrear el índice GIN con el schema correcto
 CREATE INDEX idx_clientes_nombre ON clientes USING gin(nombre extensions.gin_trgm_ops);
 
 -- 3. Recrear función con search_path seguro
