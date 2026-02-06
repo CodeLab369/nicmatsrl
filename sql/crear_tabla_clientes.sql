@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS clientes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Habilitar extensión pg_trgm para búsqueda por similitud
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- Índices para búsqueda rápida
 CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes USING gin(nombre gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON clientes(telefono);
