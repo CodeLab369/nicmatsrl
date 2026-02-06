@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS clientes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Habilitar extensión pg_trgm para búsqueda por similitud
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- Habilitar extensión pg_trgm en schema extensions (buena práctica Supabase)
+CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions;
 
 -- Índices para búsqueda rápida
-CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes USING gin(nombre gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes USING gin(nombre extensions.gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON clientes(telefono);
 CREATE INDEX IF NOT EXISTS idx_clientes_email ON clientes(email);
 CREATE INDEX IF NOT EXISTS idx_clientes_created_at ON clientes(created_at DESC);
@@ -29,7 +29,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public;
 
 DROP TRIGGER IF EXISTS trigger_clientes_updated_at ON clientes;
 CREATE TRIGGER trigger_clientes_updated_at
@@ -48,9 +49,10 @@ END $$;
 -- Habilitar RLS
 ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
 
--- Política para que todos los usuarios autenticados puedan CRUD
+-- Política para que solo usuarios autenticados puedan CRUD
 CREATE POLICY "Allow all for authenticated" ON clientes
   FOR ALL
+  TO authenticated
   USING (true)
   WITH CHECK (true);
 
