@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios' | 'tienda_ventas' | 'tienda_gastos' | 'pdf_config';
+type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios' | 'tienda_ventas' | 'tienda_gastos' | 'pdf_config' | 'clientes';
 type Callback = () => void;
 
 interface RealtimeContextType {
@@ -29,6 +29,7 @@ const subscribers: Record<TableName, Set<Callback>> = {
   tienda_ventas: new Set(),
   tienda_gastos: new Set(),
   pdf_config: new Set(),
+  clientes: new Set(),
 };
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
@@ -73,7 +74,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_ventas' }, handleChange('tienda_ventas'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_gastos' }, handleChange('tienda_gastos'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, handleChange('user_presence'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pdf_config' }, handleChange('pdf_config'));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pdf_config' }, handleChange('pdf_config'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, handleChange('clientes'));
 
     // Suscribirse al canal
     channel.subscribe((status) => {

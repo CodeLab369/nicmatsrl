@@ -56,6 +56,9 @@ export const ROUTES = {
   // Tiendas
   STORES: '/dashboard/tiendas',
   
+  // Clientes
+  CLIENTS: '/dashboard/clientes',
+  
   // Estadísticas
   STATISTICS: '/dashboard/estadisticas',
   

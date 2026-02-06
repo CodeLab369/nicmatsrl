@@ -15,6 +15,7 @@ export interface BaseEntity {
 export interface UserPermissions {
   inventario: boolean;
   tiendas: boolean;
+  clientes: boolean;
   cotizaciones: boolean;
   movimientos: boolean;
   estadisticas: boolean;

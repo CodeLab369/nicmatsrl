@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
@@ -46,6 +46,7 @@ export function EditUserDialog({
   const [permissions, setPermissions] = useState<UserPermissions>({
     inventario: true,
     tiendas: true,
+    clientes: true,
     cotizaciones: true,
     movimientos: true,
     estadisticas: true,
@@ -87,6 +88,7 @@ export function EditUserDialog({
     setPermissions(user.permissions || {
       inventario: true,
       tiendas: true,
+      clientes: true,
       cotizaciones: true,
       movimientos: true,
       estadisticas: true,
@@ -269,6 +271,19 @@ export function EditUserDialog({
                 <div className="flex items-center gap-2">
                   <Store className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Tiendas</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.clientes}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, clientes: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Clientes</span>
                 </div>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">

@@ -5,7 +5,7 @@ import {
   Plus, Search, Clock, CheckCircle, ShoppingCart, FileText,
   ChevronLeft, ChevronRight, Eye, Printer, Check, X, Trash2,
   Package, User, Phone, Mail, MapPin, Calendar, AlertCircle,
-  Minus, RefreshCw, Pencil
+  Minus, RefreshCw, Pencil, UserPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTableSubscription } from '@/contexts';
@@ -128,6 +128,16 @@ export default function CotizacionesPage() {
   const [clienteData, setClienteData] = useState({
     nombre: '', telefono: '', email: '', direccion: ''
   });
+  
+  // Autocompletado de clientes
+  const [clienteSugerencias, setClienteSugerencias] = useState<{id: string; nombre: string; telefono: string; email: string; direccion: string}[]>([]);
+  const [showClienteSugerencias, setShowClienteSugerencias] = useState(false);
+  const [clienteBusqueda, setClienteBusqueda] = useState('');
+  const [addClienteDialogOpen, setAddClienteDialogOpen] = useState(false);
+  const [isSavingCliente, setIsSavingCliente] = useState(false);
+  const clienteInputRef = useRef<HTMLInputElement>(null);
+  const clienteSugerenciasRef = useRef<HTMLDivElement>(null);
+  
   const [productosAgregados, setProductosAgregados] = useState<Producto[]>([]);
   const [productoActual, setProductoActual] = useState({
     marca: '', amperaje: '', cantidad: '', precio: ''
@@ -225,6 +235,82 @@ export default function CotizacionesPage() {
     } catch (error) {
       console.error('Error fetching clientes:', error);
     }
+  }, []);
+
+  // Buscar clientes desde la tabla clientes para autocompletado
+  const buscarClientes = useCallback(async (query: string) => {
+    if (!query || query.length < 2) {
+      setClienteSugerencias([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/clientes?searchCliente=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      setClienteSugerencias(data.clientes || []);
+    } catch (error) {
+      console.error('Error buscando clientes:', error);
+    }
+  }, []);
+
+  // Debounce para búsqueda de clientes
+  const clienteSearchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const handleClienteNombreChange = (value: string) => {
+    setClienteBusqueda(value);
+    setClienteData(prev => ({ ...prev, nombre: value }));
+    setShowClienteSugerencias(true);
+    
+    if (clienteSearchTimeout.current) clearTimeout(clienteSearchTimeout.current);
+    clienteSearchTimeout.current = setTimeout(() => buscarClientes(value), 300);
+  };
+
+  // Seleccionar cliente de las sugerencias
+  const seleccionarCliente = (cliente: typeof clienteSugerencias[0]) => {
+    setClienteData({
+      nombre: cliente.nombre,
+      telefono: cliente.telefono || '',
+      email: cliente.email || '',
+      direccion: cliente.direccion || '',
+    });
+    setClienteBusqueda(cliente.nombre);
+    setShowClienteSugerencias(false);
+  };
+
+  // Guardar nuevo cliente desde cotizaciones
+  const handleGuardarNuevoCliente = async () => {
+    if (!clienteData.nombre.trim()) return;
+    setIsSavingCliente(true);
+    try {
+      const response = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clienteData),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: 'Cliente guardado', description: `${clienteData.nombre} fue agregado a la lista de clientes` });
+        setAddClienteDialogOpen(false);
+      } else {
+        toast({ title: 'Error', description: data.error || 'Error al guardar', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' });
+    } finally {
+      setIsSavingCliente(false);
+    }
+  };
+
+  // Cerrar sugerencias al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        clienteInputRef.current && !clienteInputRef.current.contains(e.target as Node) &&
+        clienteSugerenciasRef.current && !clienteSugerenciasRef.current.contains(e.target as Node)
+      ) {
+        setShowClienteSugerencias(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Initial fetch
@@ -363,6 +449,8 @@ export default function CotizacionesPage() {
   // Limpiar formulario
   const handleLimpiar = () => {
     setClienteData({ nombre: '', telefono: '', email: '', direccion: '' });
+    setClienteBusqueda('');
+    setClienteSugerencias([]);
     setProductosAgregados([]);
     setProductoActual({ marca: '', amperaje: '', cantidad: '', precio: '' });
     setAmperajeBusqueda('');
@@ -484,6 +572,7 @@ export default function CotizacionesPage() {
       email: cot.cliente_email || '',
       direccion: cot.cliente_direccion || ''
     });
+    setClienteBusqueda(cot.cliente_nombre || '');
     setProductosAgregados(cot.productos || []);
     setDescuento(cot.descuento?.toString() || '0');
     setVigenciaDias(cot.vigencia_dias?.toString() || '7');
@@ -1115,18 +1204,64 @@ export default function CotizacionesPage() {
               <CardContent className="space-y-6">
                 {/* Datos del cliente */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Datos del Cliente</span>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Datos del Cliente</span>
+                    </div>
+                    {clienteData.nombre.trim() && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setAddClienteDialogOpen(true)}
+                      >
+                        <UserPlus className="h-3 w-3 mr-1" />
+                        Guardar Cliente
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
+                    <div className="relative">
                       <Label>Nombre</Label>
                       <Input 
-                        placeholder="Nombre del cliente"
-                        value={clienteData.nombre}
-                        onChange={(e) => setClienteData({ ...clienteData, nombre: e.target.value })}
+                        ref={clienteInputRef}
+                        placeholder="Buscar o escribir nombre..."
+                        value={clienteBusqueda}
+                        onChange={(e) => handleClienteNombreChange(e.target.value)}
+                        onFocus={() => clienteBusqueda.length >= 2 && setShowClienteSugerencias(true)}
                       />
+                      {/* Dropdown de sugerencias de clientes */}
+                      {showClienteSugerencias && clienteSugerencias.length > 0 && (
+                        <div 
+                          ref={clienteSugerenciasRef}
+                          className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {clienteSugerencias.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => seleccionarCliente(c)}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                            >
+                              <div className="font-medium">{c.nombre}</div>
+                              {(c.telefono || c.email) && (
+                                <div className="text-xs text-muted-foreground">
+                                  {c.telefono && <span>{c.telefono}</span>}
+                                  {c.telefono && c.email && <span> · </span>}
+                                  {c.email && <span>{c.email}</span>}
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showClienteSugerencias && clienteBusqueda.length >= 2 && clienteSugerencias.length === 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
+                          No se encontraron clientes
+                        </div>
+                      )}
                     </div>
                     <div>
                       <Label>Teléfono</Label>
@@ -1155,6 +1290,29 @@ export default function CotizacionesPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Dialog guardar cliente nuevo */}
+                <AlertDialog open={addClienteDialogOpen} onOpenChange={setAddClienteDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Guardar Cliente</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        ¿Guardar a <strong>{clienteData.nombre}</strong> en la lista de clientes para futuras cotizaciones?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="text-sm space-y-1 px-1">
+                      {clienteData.telefono && <p><strong>Teléfono:</strong> {clienteData.telefono}</p>}
+                      {clienteData.email && <p><strong>Email:</strong> {clienteData.email}</p>}
+                      {clienteData.direccion && <p><strong>Dirección:</strong> {clienteData.direccion}</p>}
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleGuardarNuevoCliente} disabled={isSavingCliente}>
+                        {isSavingCliente ? 'Guardando...' : 'Guardar'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Agregar productos */}
                 <div>

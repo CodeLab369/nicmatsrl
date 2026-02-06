@@ -32,7 +32,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
-  permission?: 'inventario' | 'tiendas' | 'cotizaciones' | 'movimientos' | 'estadisticas';
+  permission?: 'inventario' | 'tiendas' | 'clientes' | 'cotizaciones' | 'movimientos' | 'estadisticas';
 }
 
 interface NavGroup {
@@ -65,6 +65,12 @@ const navigation: NavGroup[] = [
         href: ROUTES.STORES,
         icon: Store,
         permission: 'tiendas',
+      },
+      {
+        title: 'Clientes',
+        href: ROUTES.CLIENTS,
+        icon: Users,
+        permission: 'clientes',
       },
       {
         title: 'Cotizaciones',

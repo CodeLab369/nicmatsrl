@@ -15,6 +15,7 @@ export const revalidate = 0;
 const DEFAULT_PERMISSIONS = {
   inventario: true,
   tiendas: true,
+  clientes: true,
   cotizaciones: true,
   movimientos: true,
   estadisticas: true,
