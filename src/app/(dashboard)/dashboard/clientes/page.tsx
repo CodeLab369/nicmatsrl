@@ -314,11 +314,8 @@ export default function ClientesPage() {
 
   // Descargar formato
   const handleDownloadFormat = () => {
-    const formatData = [
-      { Nombre: 'Juan Pérez', 'Teléfono': '70012345', Email: 'juan@email.com', 'Dirección': 'Av. Principal #123' },
-      { Nombre: 'María López', 'Teléfono': '71098765', Email: 'maria@email.com', 'Dirección': 'Calle Sucre #456' },
-    ];
-    const ws = XLSX.utils.json_to_sheet(formatData);
+    const headers = [['Nombre', 'Teléfono', 'Email', 'Dirección']];
+    const ws = XLSX.utils.aoa_to_sheet(headers);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Formato');
     const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
