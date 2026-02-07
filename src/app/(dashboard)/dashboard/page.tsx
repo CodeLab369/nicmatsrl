@@ -426,6 +426,15 @@ export default function DashboardPage() {
                   </div>
                 </Link>
               )}
+              {user?.permissions?.clientes && (
+                <Link href="/dashboard/clientes">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/20 transition-colors cursor-pointer">
+                    <Users className="h-8 w-8 text-teal-500 mb-2" />
+                    <span className="text-sm font-medium">Clientes</span>
+                    <span className="text-xs text-muted-foreground">Gestión de clientes</span>
+                  </div>
+                </Link>
+              )}
               {user?.permissions?.estadisticas && (
                 <Link href="/dashboard/estadisticas">
                   <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-colors cursor-pointer">
