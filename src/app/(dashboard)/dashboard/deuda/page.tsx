@@ -21,6 +21,7 @@ interface DeudaOperacion {
   tipo: 'deposito' | 'camion' | 'compra';
   detalle: string;
   entidad_financiera: string;
+  metodo_pago: string;
   kilos: number;
   precio_unitario: number;
   importe: number;
@@ -46,6 +47,7 @@ interface DeudaData {
 }
 
 const ENTIDADES = ['Mercantil', 'Unión', 'BNB'];
+const METODOS_PAGO = ['Transferencia', 'QR'];
 
 export default function DeudaPage() {
   const { toast } = useToast();
@@ -63,7 +65,7 @@ export default function DeudaPage() {
   // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTipo, setDialogTipo] = useState<'deposito' | 'camion' | 'compra'>('deposito');
-  const [formData, setFormData] = useState({ detalle: '', entidad_financiera: '', kilos: '', precio_unitario: '', importe: '' });
+  const [formData, setFormData] = useState({ detalle: '', entidad_financiera: '', metodo_pago: '', kilos: '', precio_unitario: '', importe: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit
@@ -128,6 +130,7 @@ export default function DeudaPage() {
 
       if (dialogTipo === 'deposito') {
         payload.entidad_financiera = formData.entidad_financiera;
+        payload.metodo_pago = formData.metodo_pago;
         payload.importe = formData.importe;
       } else if (dialogTipo === 'camion') {
         payload.kilos = formData.kilos;
@@ -166,6 +169,7 @@ export default function DeudaPage() {
 
       if (editingOp.tipo === 'deposito') {
         payload.entidad_financiera = formData.entidad_financiera;
+        payload.metodo_pago = formData.metodo_pago;
         payload.importe = formData.importe;
       } else if (editingOp.tipo === 'camion') {
         payload.kilos = formData.kilos;
@@ -206,7 +210,7 @@ export default function DeudaPage() {
     }
   };
 
-  const resetForm = () => setFormData({ detalle: '', entidad_financiera: '', kilos: '', precio_unitario: '', importe: '' });
+  const resetForm = () => setFormData({ detalle: '', entidad_financiera: '', metodo_pago: '', kilos: '', precio_unitario: '', importe: '' });
 
   const openCreateDialog = (tipo: 'deposito' | 'camion' | 'compra') => {
     setDialogTipo(tipo);
@@ -219,6 +223,7 @@ export default function DeudaPage() {
     setFormData({
       detalle: op.detalle,
       entidad_financiera: op.entidad_financiera,
+      metodo_pago: op.metodo_pago || '',
       kilos: op.kilos.toString(),
       precio_unitario: op.precio_unitario.toString(),
       importe: op.importe.toString(),
@@ -425,6 +430,9 @@ export default function DeudaPage() {
                           {op.tipo === 'deposito' && op.entidad_financiera && (
                             <Badge variant="outline"><Building2 className="h-3 w-3 mr-1" />{op.entidad_financiera}</Badge>
                           )}
+                          {op.tipo === 'deposito' && op.metodo_pago && (
+                            <Badge variant="outline" className="ml-1">{op.metodo_pago}</Badge>
+                          )}
                           {op.tipo === 'camion' && (
                             <span>{op.kilos} kg × {formatCurrency(op.precio_unitario)}</span>
                           )}
@@ -498,6 +506,15 @@ export default function DeudaPage() {
                   </Select>
                 </div>
                 <div>
+                  <Label>Método de Pago</Label>
+                  <Select value={formData.metodo_pago} onValueChange={(v) => setFormData({ ...formData, metodo_pago: v })}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
+                    <SelectContent>
+                      {METODOS_PAGO.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label>Importe (Bs.)</Label>
                   <Input type="number" step="0.01" value={formData.importe} onChange={(e) => setFormData({ ...formData, importe: e.target.value })} placeholder="0.00" />
                 </div>
@@ -561,6 +578,15 @@ export default function DeudaPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ENTIDADES.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Método de Pago</Label>
+                  <Select value={formData.metodo_pago} onValueChange={(v) => setFormData({ ...formData, metodo_pago: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {METODOS_PAGO.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

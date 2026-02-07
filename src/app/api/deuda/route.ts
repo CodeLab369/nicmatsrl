@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear operación
-    const { tipo, detalle, entidad_financiera, kilos, precio_unitario, importe } = body;
+    const { tipo, detalle, entidad_financiera, metodo_pago, kilos, precio_unitario, importe } = body;
 
     if (!tipo || !['deposito', 'camion', 'compra'].includes(tipo)) {
       return NextResponse.json({ error: 'Tipo de operación no válido' }, { status: 400 });
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
         tipo,
         detalle: detalle || '',
         entidad_financiera: entidad_financiera || '',
+        metodo_pago: metodo_pago || '',
         kilos: parseFloat(kilos) || 0,
         precio_unitario: parseFloat(precio_unitario) || 0,
         importe: finalImporte,
@@ -153,13 +154,14 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, tipo, detalle, entidad_financiera, kilos, precio_unitario, importe } = body;
+    const { id, tipo, detalle, entidad_financiera, metodo_pago, kilos, precio_unitario, importe } = body;
 
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
     const updates: Record<string, unknown> = {};
     if (detalle !== undefined) updates.detalle = detalle;
     if (entidad_financiera !== undefined) updates.entidad_financiera = entidad_financiera;
+    if (metodo_pago !== undefined) updates.metodo_pago = metodo_pago;
     if (kilos !== undefined) updates.kilos = parseFloat(kilos) || 0;
     if (precio_unitario !== undefined) updates.precio_unitario = parseFloat(precio_unitario) || 0;
 
