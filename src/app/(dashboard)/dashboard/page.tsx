@@ -26,6 +26,8 @@ import {
   UserCog,
   AlertTriangle,
   ArrowUpRight,
+  Landmark,
+  Banknote,
 } from 'lucide-react';
 import {
   BarChart,
@@ -450,6 +452,24 @@ export default function DashboardPage() {
                     <TrendingUp className="h-8 w-8 text-cyan-500 mb-2" />
                     <span className="text-sm font-medium">Movimientos</span>
                     <span className="text-xs text-muted-foreground">Control financiero</span>
+                  </div>
+                </Link>
+              )}
+              {user?.permissions?.deuda && (
+                <Link href="/dashboard/deuda">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 transition-colors cursor-pointer">
+                    <Landmark className="h-8 w-8 text-indigo-500 mb-2" />
+                    <span className="text-sm font-medium">Deuda</span>
+                    <span className="text-xs text-muted-foreground">Control de deuda</span>
+                  </div>
+                </Link>
+              )}
+              {user?.permissions?.dinero && (
+                <Link href="/dashboard/dinero">
+                  <div className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer">
+                    <Banknote className="h-8 w-8 text-emerald-500 mb-2" />
+                    <span className="text-sm font-medium">Dinero</span>
+                    <span className="text-xs text-muted-foreground">Flujo de efectivo</span>
                   </div>
                 </Link>
               )}

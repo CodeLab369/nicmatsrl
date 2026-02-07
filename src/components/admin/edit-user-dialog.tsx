@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp, Users } from 'lucide-react';
+import { Eye, EyeOff, Package, Store, FileText, BarChart3, TrendingUp, Users, Landmark, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts';
 import { updateUserSchema, UpdateUserFormData } from '@/lib/validations';
@@ -49,6 +49,8 @@ export function EditUserDialog({
     clientes: true,
     cotizaciones: true,
     movimientos: true,
+    deuda: true,
+    dinero: true,
     estadisticas: true,
   });
   const { toast } = useToast();
@@ -91,6 +93,8 @@ export function EditUserDialog({
       clientes: true,
       cotizaciones: true,
       movimientos: true,
+      deuda: true,
+      dinero: true,
       estadisticas: true,
     });
   }, [user, reset]);
@@ -310,6 +314,32 @@ export function EditUserDialog({
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Movimientos</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.deuda}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, deuda: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Deuda</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={permissions.dinero}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, dinero: checked === true }))
+                  }
+                  disabled={isSubmitting}
+                />
+                <div className="flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Dinero</span>
                 </div>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">

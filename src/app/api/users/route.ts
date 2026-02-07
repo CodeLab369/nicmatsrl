@@ -18,6 +18,8 @@ const DEFAULT_PERMISSIONS = {
   clientes: true,
   cotizaciones: true,
   movimientos: true,
+  deuda: true,
+  dinero: true,
   estadisticas: true,
 };
 

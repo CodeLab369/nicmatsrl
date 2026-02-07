@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { createBrowserClient } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios' | 'tienda_ventas' | 'tienda_gastos' | 'pdf_config' | 'clientes';
+type TableName = 'inventory' | 'cotizaciones' | 'empresa_config' | 'users' | 'tiendas' | 'tienda_inventario' | 'user_presence' | 'tienda_envios' | 'tienda_ventas' | 'tienda_gastos' | 'pdf_config' | 'clientes' | 'deuda_config' | 'deuda_operaciones' | 'dinero_operaciones';
 type Callback = () => void;
 
 interface RealtimeContextType {
@@ -30,6 +30,9 @@ const subscribers: Record<TableName, Set<Callback>> = {
   tienda_gastos: new Set(),
   pdf_config: new Set(),
   clientes: new Set(),
+  deuda_config: new Set(),
+  deuda_operaciones: new Set(),
+  dinero_operaciones: new Set(),
 };
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
@@ -75,7 +78,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tienda_gastos' }, handleChange('tienda_gastos'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, handleChange('user_presence'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pdf_config' }, handleChange('pdf_config'))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, handleChange('clientes'));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, handleChange('clientes'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deuda_config' }, handleChange('deuda_config'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deuda_operaciones' }, handleChange('deuda_operaciones'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dinero_operaciones' }, handleChange('dinero_operaciones'));
 
     // Suscribirse al canal
     channel.subscribe((status) => {

@@ -65,6 +65,12 @@ export const ROUTES = {
   // Movimientos (Control Financiero)
   MOVEMENTS: '/dashboard/movimientos',
   
+  // Deuda
+  DEBT: '/dashboard/deuda',
+  
+  // Dinero
+  MONEY: '/dashboard/dinero',
+  
   // Configuración
   SETTINGS: '/dashboard/configuracion',
 } as const;

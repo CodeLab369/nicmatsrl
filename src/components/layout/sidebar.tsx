@@ -16,6 +16,8 @@ import {
   BarChart3,
   WifiOff,
   AlertTriangle,
+  Landmark,
+  Banknote,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth, useRealtimeContext, useTableSubscription } from '@/contexts';
@@ -32,7 +34,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
-  permission?: 'inventario' | 'tiendas' | 'clientes' | 'cotizaciones' | 'movimientos' | 'estadisticas';
+  permission?: 'inventario' | 'tiendas' | 'clientes' | 'cotizaciones' | 'movimientos' | 'deuda' | 'dinero' | 'estadisticas';
 }
 
 interface NavGroup {
@@ -83,6 +85,18 @@ const navigation: NavGroup[] = [
         href: ROUTES.MOVEMENTS,
         icon: TrendingUp,
         permission: 'movimientos',
+      },
+      {
+        title: 'Deuda',
+        href: ROUTES.DEBT,
+        icon: Landmark,
+        permission: 'deuda',
+      },
+      {
+        title: 'Dinero',
+        href: ROUTES.MONEY,
+        icon: Banknote,
+        permission: 'dinero',
       },
       {
         title: 'Estadísticas',

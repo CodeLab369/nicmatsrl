@@ -18,6 +18,8 @@ export interface UserPermissions {
   clientes: boolean;
   cotizaciones: boolean;
   movimientos: boolean;
+  deuda: boolean;
+  dinero: boolean;
   estadisticas: boolean;
   [key: string]: boolean; // Para módulos futuros
 }
