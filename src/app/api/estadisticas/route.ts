@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -95,7 +98,11 @@ async function getEstadisticasVentas(startDate: string | null, endDate: string |
     ventas_count: number;
   }>();
 
+  // Acumular descuento total de todas las cotizaciones
+  let totalDescuento = 0;
+
   cotizaciones?.forEach(cot => {
+    totalDescuento += parseFloat(cot.descuento) || 0;
     const productos = cot.productos || [];
     productos.forEach((prod: any) => {
       const key = `${prod.marca}-${prod.amperaje}`;
@@ -164,13 +171,16 @@ async function getEstadisticasVentas(startDate: string | null, endDate: string |
 
   const marcasArray = Array.from(marcasMap.values()).sort((a, b) => b.cantidad_vendida - a.cantidad_vendida);
 
-  // Totales generales
+  // Totales generales (restar descuentos del valor y ganancia)
+  const subtotalValor = productosArray.reduce((sum, p) => sum + p.valor_venta, 0);
+  const totalCosto = productosArray.reduce((sum, p) => sum + p.costo_total, 0);
   const totales = {
     total_ventas: cotizaciones?.length || 0,
     total_unidades: productosArray.reduce((sum, p) => sum + p.cantidad_vendida, 0),
-    total_costo: productosArray.reduce((sum, p) => sum + p.costo_total, 0),
-    total_valor: productosArray.reduce((sum, p) => sum + p.valor_venta, 0),
-    total_ganancia: productosArray.reduce((sum, p) => sum + p.ganancia, 0),
+    total_costo: totalCosto,
+    total_valor: subtotalValor - totalDescuento,
+    total_ganancia: (subtotalValor - totalDescuento) - totalCosto,
+    total_descuento: totalDescuento,
   };
 
   return NextResponse.json({
@@ -396,13 +406,17 @@ async function getEstadisticasInventario() {
     };
   }).sort((a, b) => b.total_unidades - a.total_unidades) || [];
 
-  // Totales
+  // Totales (incluir valor de tiendas en el total)
+  const valorVentaCentral = inventario?.reduce((sum, i) => sum + (i.cantidad * (i.precio_venta || 0)), 0) || 0;
+  const valorVentaTiendas = invTiendas?.reduce((sum, i) => sum + (i.cantidad * (i.precio_venta || 0)), 0) || 0;
   const totales = {
     total_productos_central: inventario?.length || 0,
     total_unidades_central: inventario?.reduce((sum, i) => sum + i.cantidad, 0) || 0,
     total_unidades_tiendas: invTiendas?.reduce((sum, i) => sum + i.cantidad, 0) || 0,
     valor_costo_total: inventario?.reduce((sum, i) => sum + (i.cantidad * (i.costo || 0)), 0) || 0,
-    valor_venta_total: inventario?.reduce((sum, i) => sum + (i.cantidad * (i.precio_venta || 0)), 0) || 0,
+    valor_venta_total: valorVentaCentral + valorVentaTiendas,
+    valor_venta_central: valorVentaCentral,
+    valor_venta_tiendas: valorVentaTiendas,
     productos_sin_stock: sinStock.length,
     productos_stock_bajo: stockBajo.length,
   };

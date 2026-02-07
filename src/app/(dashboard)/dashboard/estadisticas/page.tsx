@@ -131,7 +131,9 @@ export default function EstadisticasPage() {
     }
   }, [tipoEstadistica, periodo, fetchEstadisticas]);
 
-  // Realtime: actualizar cuando cambien ventas o tiendas
+  // Realtime: actualizar cuando cambien datos relevantes
+  useTableSubscription('cotizaciones', fetchEstadisticas);
+  useTableSubscription('inventory', fetchEstadisticas);
   useTableSubscription('tienda_ventas', fetchEstadisticas);
   useTableSubscription('tienda_inventario', fetchEstadisticas);
   useTableSubscription('tiendas', fetchEstadisticas);
