@@ -271,7 +271,7 @@ export default function DeudaPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Saldo Actual */}
         <Card className="border-indigo-500/30">
           <CardContent className="pt-4">
