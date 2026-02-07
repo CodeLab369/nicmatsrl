@@ -225,9 +225,7 @@ export default function DineroPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Banknote className="h-7 w-7 text-emerald-600" /> Dinero
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Dinero</h1>
           <p className="text-muted-foreground">Control de ingresos por ventas, tiendas y salidas de efectivo</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -241,7 +239,7 @@ export default function DineroPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-blue-500/30">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-1">

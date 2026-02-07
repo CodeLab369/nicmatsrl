@@ -254,9 +254,7 @@ export default function DeudaPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Landmark className="h-7 w-7 text-indigo-600" /> Deuda
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Deuda</h1>
           <p className="text-muted-foreground">Control de deuda, depósitos, camiones y compras</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -273,9 +271,9 @@ export default function DeudaPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Saldo Actual */}
-        <Card className="col-span-2 lg:col-span-1 border-indigo-500/30">
+        <Card className="border-indigo-500/30">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs text-muted-foreground">Saldo Actual</p>
